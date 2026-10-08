@@ -6,8 +6,7 @@ import json
 import uuid
 
 from config.GameConfig import GameConfig
-from CombatProfileManager import CombatProfileManager, UnitRole
-
+from combat.CombatProfileManager import CombatProfileManager, UnitRole
 
 class UnitManager:
     """
@@ -89,7 +88,15 @@ class UnitManager:
 
         for index, champion in enumerate(self.champions):
 
-            data_id = champion.get("id")
+            # ---------------------------------------------------------
+            # 🆔 Identificador original do dataset
+            # ---------------------------------------------------------
+
+            data_id = (
+                champion.get("id")
+                or champion.get("apiName")
+                or champion.get("characterName")
+            )
 
             if data_id is not None:
                 self._index_by_data_id[data_id] = index
@@ -166,30 +173,27 @@ class UnitManager:
     # =============================================================
     # 🆔 ID INTERNO
     # =============================================================
-
     def get_unit_id(self, champion):
         """
-        Retorna o ID INTERNO utilizado pelo jogo.
+        Retorna o ID interno do campeão.
 
-        IMPORTANTE:
+        O ID interno é o índice do campeão no catálogo.
 
-        O ID interno é sempre o índice do campeão no catálogo.
+        O dataset atual pode não possuir ``id``.
+        Nesse caso utilizamos:
 
-        Exemplo:
+            1. id
+            2. apiName
+            3. characterName
 
-            self.champions[0] -> id 0
-            self.champions[1] -> id 1
-            self.champions[2] -> id 2
-            ...
-
-        Isso mantém compatibilidade com o env.py antigo.
+        como identificador do campeão.
         """
 
         if champion is None:
             return None
 
         # ---------------------------------------------------------
-        # Se for exatamente o objeto armazenado no catálogo.
+        # 🧩 Se for exatamente o objeto do catálogo
         # ---------------------------------------------------------
 
         for index, stored_champion in self._champion_by_index.items():
@@ -198,47 +202,49 @@ class UnitManager:
                 return index
 
         # ---------------------------------------------------------
-        # Se for uma cópia do campeão.
+        # 🆔 Procurar pelo identificador do dataset
         # ---------------------------------------------------------
 
-        data_id = champion.get("champion_id")
-
-        if data_id is None:
-            data_id = champion.get("id")
+        data_id = (
+            champion.get("id")
+            or champion.get("apiName")
+            or champion.get("characterName")
+            or champion.get("champion_id")
+        )
 
         if data_id in self._index_by_data_id:
             return self._index_by_data_id[data_id]
 
         # ---------------------------------------------------------
-        # Caso já seja um ID interno.
+        # 🔢 Caso já seja um ID interno
         # ---------------------------------------------------------
 
         if isinstance(data_id, int):
+
             if data_id in self._champion_by_index:
                 return data_id
 
         return None
 
+
     # =============================================================
     # 🆔 ID ORIGINAL DO JSON
     # =============================================================
-
     def get_data_id(self, champion):
         """
-        Retorna o ID original presente no units.json.
-
-        Isso é separado do ID interno.
-
-        Retorna None caso não exista.
+        Retorna o identificador original do campeão no dataset.
         """
 
         if champion is None:
             return None
 
-        return champion.get(
-            "champion_id",
+        return (
             champion.get("id")
+            or champion.get("apiName")
+            or champion.get("characterName")
+            or champion.get("champion_id")
         )
+
 
     # =============================================================
     # 🔎 LOCALIZAR CAMPEÃO

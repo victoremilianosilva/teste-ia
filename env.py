@@ -43,9 +43,7 @@ from ai.ActionMaskManager import ActionMaskManager, ActionType
 from ai.RewardManager import RewardManager
 
 from SynergyManager import SynergyManager
-from CombatProfileManager import CombatProfileManager, UnitRole
-
-
+from combat.CombatProfileManager import CombatProfileManager, UnitRole
 class MiniTFTEnv:
 
     # ============================================================
@@ -90,7 +88,7 @@ class MiniTFTEnv:
 
         if unit_manager is None:
 
-            self.combat_profile_mgr = CombatProfileManager()
+            self.combat_profile_mgr =  CombatProfileManager()
 
             self.unit_manager = UnitManager(
                 units_path=self.units_path,
@@ -275,41 +273,71 @@ class MiniTFTEnv:
     # ============================================================
     # 🪑 STARTING UNIT
     # ============================================================
-
     def _create_starting_unit(self):
         """
-        Cria uma unidade inicial de custo 1.
+        Cria a unidade inicial do jogador e coloca no bench.
 
-        A cópia física vem do UnitPool global.
+        A unidade é retirada do UnitPool global.
         """
 
-        if self.unit_pool is None:
+        # ============================================================
+        # 1. Verifica se existe espaço
+        # ============================================================
+
+        if not self.bench_manager.has_free_slot():
             raise RuntimeError(
-                "MiniTFTEnv precisa receber um UnitPool."
+                "Não foi possível criar a unidade inicial: "
+                "bench está cheio."
             )
 
-        base_unit = self.unit_pool.draw(1)
+        # ============================================================
+        # 2. Pega uma unidade do pool
+        # ============================================================
 
-        if base_unit is None:
+        champion = self.unit_pool.draw(1)
+
+        if champion is None:
             raise RuntimeError(
-                "Não foi possível obter unidade inicial "
-                "de custo 1 do UnitPool."
+                "Não foi possível criar a unidade inicial: "
+                "UnitPool não retornou nenhum campeão de custo 1."
             )
 
-        unit = self.unit_manager.create_unit(
-            base_unit
-        )
+        # ============================================================
+        # 3. Cria a unidade pertencente ao jogador
+        # ============================================================
 
-        if self.bench_manager.add_unit(unit):
-            return
+        unit = self.unit_manager.create_unit(champion)
 
-        # Segurança.
-        self.unit_pool.return_unit(unit)
+        if unit is None:
+            raise RuntimeError(
+                f"UnitManager não conseguiu criar a unidade:\n"
+                f"{champion}"
+            )
 
-        raise RuntimeError(
-            "Não foi possível colocar a unidade "
-            "inicial no bench."
-        )
+        # ============================================================
+        # 4. Coloca no bench
+        # ============================================================
+
+        success = self.bench_manager.add_unit(unit)
+
+        if not success:
+            # Se por algum motivo falhar, devolvemos a unidade
+            # para o pool global.
+
+            try:
+                self.unit_pool.return_unit(unit)
+            except Exception:
+                pass
+
+            raise RuntimeError(
+                "Não foi possível colocar a unidade inicial "
+                "no bench.\n"
+                f"Unidade: {unit}\n"
+                f"Slots livres: "
+                f"{self.bench_manager.get_free_slots()}"
+            )
+
+        return unit
 
     # ============================================================
     # 🛒 SHOP
@@ -1092,7 +1120,8 @@ class MiniTFTEnv:
         owned_units = self._get_all_units()
 
         self.composition_manager.update(
-            owned_units
+            self.board_manager.get_units(),
+            self.bench_manager.get_units()
         )
 
         try:
@@ -1699,13 +1728,13 @@ class MiniTFTEnv:
     # ============================================================
     # 📦 FREE BENCH
     # ============================================================
-
     def _get_free_bench(self):
+        """
+        Retorna a quantidade de slots livres no bench.
+        """
 
-        return len(
-            self.bench_manager
-            .get_free_slots()
-        )
+        return self.bench_manager.get_free_slots()
+
 
     # ============================================================
     # 🔍 BENCH SLOT

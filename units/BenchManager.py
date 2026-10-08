@@ -40,8 +40,8 @@ class BenchManager:
         """
         Cria um bench vazio.
 
-        Mantemos uma lista flat porque o projeto atual trabalha
-        com slots de 0 até 8.
+        Slots:
+            0 -> 8
         """
 
         return [None] * self.max_bench
@@ -64,8 +64,13 @@ class BenchManager:
 
         return (
             isinstance(position, int)
+            and not isinstance(position, bool)
             and 0 <= position < self.max_bench
         )
+
+    # Compatibilidade com código que chama is_valid_slot()
+    def is_valid_slot(self, slot):
+        return self.is_valid_position(slot)
 
     # =============================================================
     # 🔎 CONSULTA
@@ -155,10 +160,17 @@ class BenchManager:
 
     def get_free_slots(self):
         """
-        Quantidade de slots livres.
+        Retorna a quantidade de slots livres.
         """
 
         return self.max_bench - self.get_unit_count()
+
+    def has_free_slot(self):
+        """
+        Verifica se existe pelo menos um slot livre.
+        """
+
+        return self.get_free_slot() is not None
 
     def is_full(self):
         """
@@ -171,49 +183,93 @@ class BenchManager:
     # ➕ ADICIONAR
     # =============================================================
 
-    def add_unit(self, unit, position=None):
+    def add_unit(self, unit, slot=None, position=None):
         """
         Adiciona uma unidade ao bench.
 
-        Se position for None:
-            utiliza o primeiro slot livre.
+        Args:
+            unit:
+                Unidade que será adicionada.
 
-        Retorna:
-            índice utilizado em caso de sucesso
-            None em caso de falha
+            slot:
+                Posição específica do bench.
+                Se None, usa o primeiro espaço livre.
+
+            position:
+                Alias de slot para compatibilidade com
+                add_unit_instance() e código antigo.
+
+        Returns:
+            True  -> unidade adicionada com sucesso.
+            False -> não foi possível adicionar.
         """
 
+        # ---------------------------------------------------------
+        # Unidade inválida
+        # ---------------------------------------------------------
+
         if unit is None:
-            return None
+            return False
 
         # ---------------------------------------------------------
-        # Slot específico
+        # Compatibilidade:
+        #
+        # add_unit(unit, position=3)
+        #
+        # passa a funcionar também.
         # ---------------------------------------------------------
 
-        if position is not None:
+        if slot is not None and position is not None:
+            # Não permite duas posições diferentes.
+            if slot != position:
+                return False
 
-            if not self.is_valid_position(position):
-                return None
-
-            if not self.is_empty(position):
-                return None
-
-            self.bench[position] = unit
-
-            return position
+        if slot is None:
+            slot = position
 
         # ---------------------------------------------------------
-        # Primeiro slot disponível
+        # SLOT ESPECÍFICO
+        # ---------------------------------------------------------
+
+        if slot is not None:
+
+            if not self.is_valid_position(slot):
+                return False
+
+            # Não sobrescreve unidade existente.
+            if self.bench[slot] is not None:
+                return False
+
+            self.bench[slot] = unit
+
+            return True
+
+        # ---------------------------------------------------------
+        # SLOT AUTOMÁTICO
         # ---------------------------------------------------------
 
         free_slot = self.get_free_slot()
 
         if free_slot is None:
-            return None
+            return False
 
         self.bench[free_slot] = unit
 
-        return free_slot
+        return True
+
+    # =============================================================
+    # ➕ ADICIONAR EM SLOT ESPECÍFICO
+    # =============================================================
+
+    def add_unit_at(self, unit, position):
+        """
+        Adiciona uma unidade em uma posição específica.
+        """
+
+        return self.add_unit(
+            unit,
+            slot=position
+        )
 
     # =============================================================
     # ➖ REMOVER
@@ -312,10 +368,14 @@ class BenchManager:
 
         # Primeiro tenta identidade.
         for position, bench_unit in enumerate(self.bench):
+
             if bench_unit is unit:
                 return position
 
         # Depois tenta UUID.
+        if not isinstance(unit, dict):
+            return None
+
         unit_uuid = unit.get("uuid")
 
         if unit_uuid is None:
@@ -325,6 +385,7 @@ class BenchManager:
 
             if (
                 bench_unit is not None
+                and isinstance(bench_unit, dict)
                 and bench_unit.get("uuid") == unit_uuid
             ):
                 return position
@@ -341,6 +402,7 @@ class BenchManager:
             for unit in self.bench
             if (
                 unit is not None
+                and isinstance(unit, dict)
                 and unit.get("id") == unit_id
             )
         ]
@@ -365,14 +427,17 @@ class BenchManager:
 
     def add_unit_instance(self, unit, position=None):
         """
-        Alias explícito para adicionar uma unidade existente.
+        Adiciona uma unidade existente.
 
         Não cria uma nova cópia.
+
+        position=None:
+            usa o primeiro slot livre.
         """
 
         return self.add_unit(
             unit,
-            position=position
+            slot=position
         )
 
     # =============================================================
@@ -399,7 +464,8 @@ class BenchManager:
         """
         Assinatura incluindo UUID.
 
-        Útil para detectar movimentações repetidas da mesma cópia.
+        Útil para detectar movimentações repetidas
+        da mesma cópia da unidade.
         """
 
         signature = []
@@ -454,6 +520,32 @@ class BenchManager:
             return False
 
         return True
+
+    # =============================================================
+    # 🔗 COMPATIBILIDADE DE SLOTS
+    # =============================================================
+
+    def get_occupied_slots(self):
+        """
+        Alias de get_occupied_positions().
+
+        Mantido para compatibilidade com o env.py e
+        outros componentes que trabalham com o conceito
+        de slot do bench.
+        """
+
+        return self.get_occupied_positions()
+
+
+    def get_empty_slots(self):
+        """
+        Alias de get_empty_positions().
+
+        Retorna os slots livres do bench.
+        """
+
+        return self.get_empty_positions()
+
 
     # =============================================================
     # 🐛 DEBUG

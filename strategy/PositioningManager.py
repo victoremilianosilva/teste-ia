@@ -2,8 +2,7 @@
 
 import math
 
-from CombatProfileManager import UnitRole
-
+from combat.CombatProfileManager import UnitRole
 
 class PositioningManager:
     """
@@ -950,6 +949,16 @@ class PositioningManager:
                 raw_score / max_score
             )
         )
+
+    def reset(self):
+        """
+        Reseta o estado interno do PositioningManager.
+
+        Atualmente o manager não mantém estado persistente,
+        então o reset existe apenas para manter a interface
+        compatível com o MiniTFTEnv.
+        """
+        return None
 
     # =============================================================
     # 🐛 DEBUG
