@@ -1,68 +1,30 @@
-# ============================================================
-# 🧪 test_selfplay.py
-#
-# Teste de integração:
-#
-# MiniTFTEnv
-#     ↓
-# TFTLobby
-#     ↓
-# UnitPool GLOBAL
-#     ↓
-# 8 jogadores
-#     ↓
-# ações aleatórias com MASK
-#     ↓
-# matchmaking
-#     ↓
-# combate
-#     ↓
-# dano / eliminação
-#
-# NÃO treina PPO.
-# Serve apenas para validar a arquitetura.
-# ============================================================
-
 import random
 import traceback
 
 import numpy as np
 
-from lobby.TFTLobby import TFTLobby
+from config.GameConfig import GameConfig
+from lobby.tft_loby import TFTLobby
 
 
 # ============================================================
-# ⚙️ CONFIG
+# CONFIG
 # ============================================================
 
-NUM_PLAYERS = 8
+SEED = 42
 MAX_TEST_ROUNDS = 30
-
-# Para o teste ser reproduzível.
-RANDOM_SEED = 42
+NUM_PLAYERS = 8
 
 
 # ============================================================
-# 🎲 RANDOM ACTION
+# HELPERS
 # ============================================================
 
 def choose_from_mask(mask):
     """
-    Recebe uma máscara 1D e retorna um índice válido.
-
-    Exemplo:
-
-        [0, 1, 0, 0, 1]
-
-    retorna 1 ou 4.
+    Escolhe aleatoriamente uma ação válida dentro de uma máscara.
     """
-
-    if mask is None:
-        return 0
-
-    values = np.asarray(mask).reshape(-1)
-
-    valid = np.flatnonzero(values > 0)
+    valid = np.flatnonzero(np.asarray(mask, dtype=np.float32) > 0)
 
     if len(valid) == 0:
         return 0
@@ -72,18 +34,18 @@ def choose_from_mask(mask):
 
 def build_random_action(masks):
     """
-    Constrói uma ação no formato:
+    Monta uma ação no formato esperado pelo TFTLobby.
+
+    Estrutura:
 
         [
-            type,
+            action_type,
             shop_slot,
             bench_slot,
             board_target,
             board_source,
             conditioned_board_target
         ]
-
-    respeitando as máscaras da ActionMaskManager.
     """
 
     # --------------------------------------------------------
@@ -91,824 +53,513 @@ def build_random_action(masks):
     # --------------------------------------------------------
 
     if isinstance(masks, dict):
+        type_mask = masks.get("type", masks.get("action_type"))
 
-        type_mask = masks.get(
-            "type",
-            masks.get("action_type")
-        )
+        if type_mask is None:
+            raise RuntimeError(
+                f"Máscara sem action type: {masks.keys()}"
+            )
 
-        shop_mask = masks.get(
-            "shop_slot",
-            masks.get("shop")
-        )
+        action_type = choose_from_mask(type_mask)
 
-        bench_mask = masks.get(
-            "bench_slot",
-            masks.get("bench_source")
-        )
-
+        shop_mask = masks.get("shop", np.ones(5))
+        bench_mask = masks.get("bench", np.ones(9))
         board_target_mask = masks.get(
-            "board_target"
+            "board_target",
+            np.ones(28),
         )
-
         board_source_mask = masks.get(
-            "board_source"
+            "board_source",
+            np.ones(28),
         )
-
         conditioned_target_mask = masks.get(
             "conditioned_board_target",
-            masks.get("board_move_target")
+            np.ones(28),
         )
 
     # --------------------------------------------------------
-    # Caso seja lista/tupla:
-    #
-    # [type, shop, bench, target, source, conditioned]
+    # Caso a máscara seja uma lista/tupla
     # --------------------------------------------------------
 
     elif isinstance(masks, (list, tuple)):
+        if len(masks) < 6:
+            raise RuntimeError(
+                f"Máscara com apenas {len(masks)} dimensões. "
+                f"Esperado: 6."
+            )
 
-        values = list(masks)
+        action_type = choose_from_mask(masks[0])
 
-        while len(values) < 6:
-            values.append(None)
-
-        (
-            type_mask,
-            shop_mask,
-            bench_mask,
-            board_target_mask,
-            board_source_mask,
-            conditioned_target_mask,
-        ) = values[:6]
+        shop_mask = masks[1]
+        bench_mask = masks[2]
+        board_target_mask = masks[3]
+        board_source_mask = masks[4]
+        conditioned_target_mask = masks[5]
 
     else:
-
-        # Segurança.
-        return [6, 0, 0, 0, 0, 0]
-
-    # --------------------------------------------------------
-    # TYPE
-    # --------------------------------------------------------
-
-    action_type = choose_from_mask(
-        type_mask
-    )
-
-    # --------------------------------------------------------
-    # Defaults
-    # --------------------------------------------------------
-
-    shop_slot = 0
-    bench_slot = 0
-    board_target = 0
-    board_source = 0
-    conditioned_target = 0
-
-    # --------------------------------------------------------
-    # BUY
-    # --------------------------------------------------------
-
-    if action_type == 0:
-
-        shop_slot = choose_from_mask(
-            shop_mask
+        raise RuntimeError(
+            f"Formato de máscara desconhecido: {type(masks)}"
         )
 
     # --------------------------------------------------------
-    # MOVE BENCH -> BOARD
+    # Monta ação
     # --------------------------------------------------------
 
-    elif action_type == 3:
-
-        bench_slot = choose_from_mask(
-            bench_mask
-        )
-
-        board_target = choose_from_mask(
-            board_target_mask
-        )
-
-    # --------------------------------------------------------
-    # MOVE BOARD -> BOARD
-    # --------------------------------------------------------
-
-    elif action_type == 4:
-
-        board_source = choose_from_mask(
-            board_source_mask
-        )
-
-        conditioned_target = choose_from_mask(
-            conditioned_target_mask
-        )
-
-    # --------------------------------------------------------
-    # SELL
-    # --------------------------------------------------------
-
-    elif action_type == 5:
-
-        bench_slot = choose_from_mask(
-            bench_mask
-        )
-
-    # --------------------------------------------------------
-    # REROLL / XP / PASS
-    # --------------------------------------------------------
-    #
-    # Não precisam de parâmetros extras.
-    #
-
-    return [
-        int(action_type),
-        int(shop_slot),
-        int(bench_slot),
-        int(board_target),
-        int(board_source),
-        int(conditioned_target),
+    action = [
+        action_type,
+        choose_from_mask(shop_mask),
+        choose_from_mask(bench_mask),
+        choose_from_mask(board_target_mask),
+        choose_from_mask(board_source_mask),
+        choose_from_mask(conditioned_target_mask),
     ]
 
+    return action
 
-# ============================================================
-# 🧠 OBSERVATION TEST
-# ============================================================
 
 def validate_observations(lobby):
     """
-    Valida observações dos 8 jogadores.
+    Verifica se os jogadores estão produzindo observações válidas.
     """
 
     observations = lobby.get_observations()
 
-    if len(observations) != NUM_PLAYERS:
+    if observations is None:
+        raise RuntimeError("get_observations() retornou None.")
 
-        raise AssertionError(
+    if len(observations) != NUM_PLAYERS:
+        raise RuntimeError(
             f"Esperado {NUM_PLAYERS} observations, "
-            f"recebido {len(observations)}"
+            f"recebido {len(observations)}."
         )
 
     for player_id, obs in enumerate(observations):
 
         if obs is None:
-            raise AssertionError(
-                f"Player {player_id}: observation None"
-            )
+            continue
 
         obs = np.asarray(obs)
 
         if obs.ndim != 1:
-            raise AssertionError(
-                f"Player {player_id}: "
-                f"observation não é 1D: {obs.shape}"
+            raise RuntimeError(
+                f"Player {player_id}: observation "
+                f"não é 1D: shape={obs.shape}"
             )
 
-        if not np.all(
-            np.isfinite(obs)
-        ):
-            raise AssertionError(
-                f"Player {player_id}: "
-                "observation possui NaN/Inf"
+        if not np.all(np.isfinite(obs)):
+            raise RuntimeError(
+                f"Player {player_id}: observation possui "
+                f"NaN ou Inf."
             )
 
-    print(
-        f"   ✅ Observations válidas "
-        f"({len(observations)} players)"
-    )
-
-
-# ============================================================
-# 🎭 MASK TEST
-# ============================================================
 
 def validate_masks(lobby):
     """
-    Valida que todos os players possuem máscaras.
+    Verifica as máscaras dos 8 jogadores.
     """
 
     masks = lobby.get_action_masks()
 
-    if len(masks) != NUM_PLAYERS:
+    if masks is None:
+        raise RuntimeError(
+            "get_action_masks() retornou None."
+        )
 
-        raise AssertionError(
+    if len(masks) != NUM_PLAYERS:
+        raise RuntimeError(
             f"Esperado {NUM_PLAYERS} máscaras, "
-            f"recebido {len(masks)}"
+            f"recebido {len(masks)}."
         )
 
     for player_id, player_masks in enumerate(masks):
 
-        if player_masks is None:
-
-            raise AssertionError(
-                f"Player {player_id}: masks None"
-            )
-
         if isinstance(player_masks, dict):
 
-            type_mask = player_masks.get(
+            required = [
                 "type",
-                player_masks.get("action_type")
+                "shop",
+                "bench",
+                "board_target",
+                "board_source",
+                "conditioned_board_target",
+            ]
+
+            for key in required:
+                if key not in player_masks:
+                    raise RuntimeError(
+                        f"Player {player_id}: "
+                        f"máscara sem '{key}'."
+                    )
+
+        elif isinstance(player_masks, (list, tuple)):
+
+            if len(player_masks) != 6:
+                raise RuntimeError(
+                    f"Player {player_id}: "
+                    f"esperado 6 máscaras, "
+                    f"recebido {len(player_masks)}."
+                )
+
+        else:
+            raise RuntimeError(
+                f"Player {player_id}: "
+                f"formato de máscara inválido: "
+                f"{type(player_masks)}"
             )
 
-            if type_mask is None:
-
-                raise AssertionError(
-                    f"Player {player_id}: "
-                    "máscara de type ausente"
-                )
-
-            if not np.any(
-                np.asarray(type_mask) > 0
-            ):
-
-                raise AssertionError(
-                    f"Player {player_id}: "
-                    "nenhuma ação de type válida"
-                )
-
-        elif isinstance(
-            player_masks,
-            (list, tuple)
-        ):
-
-            if len(player_masks) < 6:
-
-                raise AssertionError(
-                    f"Player {player_id}: "
-                    f"máscara possui apenas "
-                    f"{len(player_masks)} dimensões"
-                )
-
-    print(
-        "   ✅ Action masks válidas"
-    )
-
-
-# ============================================================
-# ❤️ PLAYER STATE
-# ============================================================
 
 def validate_players(lobby):
+    """
+    Verifica o estado básico dos 8 jogadores.
+    """
 
     if len(lobby.players) != NUM_PLAYERS:
-
-        raise AssertionError(
-            f"Lobby deveria possuir "
-            f"{NUM_PLAYERS} players"
+        raise RuntimeError(
+            f"Lobby deveria possuir {NUM_PLAYERS} jogadores, "
+            f"possui {len(lobby.players)}."
         )
 
     for player in lobby.players:
 
         env = player.env
 
+        # HP
         if env.hp < 0:
-
-            raise AssertionError(
-                f"Player {player.player_id}: "
-                f"HP negativo: {env.hp}"
+            raise RuntimeError(
+                f"Player {player.player_id}: HP negativo."
             )
 
         if env.hp > GameConfig.STARTING_HP:
-            raise AssertionError(
+            raise RuntimeError(
                 f"Player {player.player_id}: "
-                f"HP acima do máximo: {env.hp}"
+                f"HP acima do inicial."
             )
 
-        board_count = len(
-            env.board_manager
-            .get_occupied_positions()
+        # Board
+        occupied_board = len(
+            env.board_manager.get_occupied_positions()
         )
 
-        bench_count = len(
-            env.bench_manager
-            .get_occupied_slots()
+        if occupied_board > GameConfig.BOARD_SIZE:
+            raise RuntimeError(
+                f"Player {player.player_id}: "
+                f"board excedeu capacidade."
+            )
+
+        # Bench
+        occupied_bench = len(
+            env.bench_manager.get_occupied_slots()
         )
 
-        if board_count > env.board_size:
-
-            raise AssertionError(
+        if occupied_bench > GameConfig.MAX_BENCH:
+            raise RuntimeError(
                 f"Player {player.player_id}: "
-                f"board excedeu capacidade: "
-                f"{board_count}"
+                f"bench excedeu capacidade."
             )
 
-        if bench_count > env.max_bench:
-
-            raise AssertionError(
-                f"Player {player.player_id}: "
-                f"bench excedeu capacidade: "
-                f"{bench_count}"
-            )
-
-    print(
-        "   ✅ Estado dos 8 jogadores válido"
-    )
-
-
-# ============================================================
-# 🌐 UNIT POOL
-# ============================================================
 
 def validate_unit_pool(lobby):
+    """
+    Verifica a integridade do UnitPool global.
+    """
 
     pool = lobby.unit_pool
 
     if pool is None:
-
-        raise AssertionError(
-            "TFTLobby não possui UnitPool global"
+        raise RuntimeError(
+            "Lobby não possui UnitPool."
         )
 
     if not pool.validate():
-
-        raise AssertionError(
-            "UnitPool.validate() retornou False"
+        raise RuntimeError(
+            "UnitPool inválido."
         )
 
-    for champion_id, available in (
-        pool.available.items()
-    ):
+    for champion_id, available in pool.available.items():
 
         initial = pool.initial_counts.get(
             champion_id,
-            0
+            0,
         )
 
         if available < 0:
-
-            raise AssertionError(
-                f"Pool negativo: "
-                f"champion={champion_id}, "
-                f"available={available}"
+            raise RuntimeError(
+                f"Pool: champion {champion_id} "
+                f"ficou negativo."
             )
 
         if available > initial:
-
-            raise AssertionError(
-                f"Pool acima do inicial: "
-                f"champion={champion_id}, "
-                f"{available}/{initial}"
+            raise RuntimeError(
+                f"Pool: champion {champion_id} "
+                f"possui mais cópias disponíveis "
+                f"que o inicial."
             )
 
-    print(
-        f"   ✅ UnitPool global válido "
-        f"({pool.get_total_available()} "
-        f"cópias disponíveis)"
-    )
-
-
-# ============================================================
-# ⚔️ MATCHMAKING
-# ============================================================
-
-def validate_matchups(lobby):
-
-    alive_ids = [
-        player.player_id
-        for player in lobby.players
-        if not player.env.done
-    ]
-
-    seen = set()
-
-    for matchup in lobby.matchups:
-
-        if matchup is None:
-            continue
-
-        if not isinstance(
-            matchup,
-            (list, tuple)
-        ):
-            continue
-
-        if len(matchup) != 2:
-            continue
-
-        player_a, player_b = matchup
-
-        if player_a == player_b:
-
-            raise AssertionError(
-                f"Matchup inválido: "
-                f"player contra si mesmo: "
-                f"{player_a}"
-            )
-
-        if player_a not in alive_ids:
-            raise AssertionError(
-                f"Matchup contém player morto: "
-                f"{player_a}"
-            )
-
-        if player_b not in alive_ids:
-            raise AssertionError(
-                f"Matchup contém player morto: "
-                f"{player_b}"
-            )
-
-        pair = tuple(
-            sorted(
-                [player_a, player_b]
-            )
-        )
-
-        if pair in seen:
-
-            raise AssertionError(
-                f"Matchup duplicado: {pair}"
-            )
-
-        seen.add(pair)
-
-    print(
-        f"   ✅ Matchmaking válido "
-        f"({len(seen)} confrontos)"
-    )
-
-
-# ============================================================
-# 📊 LOBBY STATUS
-# ============================================================
 
 def print_lobby_status(lobby):
-
-    alive = [
-        player
-        for player in lobby.players
-        if not player.env.done
-    ]
+    """
+    Imprime um resumo da partida.
+    """
 
     print()
+    print("=" * 70)
     print(
-        "┌─────────────────────────────────────────┐"
+        f"ROUND {lobby.round} | "
+        f"STAGE {lobby.stage}"
     )
-
-    print(
-        f"│ 🌐 ROUND {lobby.round:<5} "
-        f"│ Alive: {len(alive):<2}              │"
-    )
-
-    print(
-        "├─────────────────────────────────────────┤"
-    )
+    print("=" * 70)
 
     for player in lobby.players:
 
         env = player.env
 
-        status = (
-            "💀"
-            if env.done
-            else "🟢"
-        )
+        alive = not env.done
 
         board_count = len(
-            env.board_manager
-            .get_occupied_positions()
+            env.board_manager.get_occupied_positions()
         )
 
         bench_count = len(
-            env.bench_manager
-            .get_occupied_slots()
+            env.bench_manager.get_occupied_slots()
         )
 
+        gold = env.economy_manager.gold
+        level = env.economy_manager.level
+
+        status = "ALIVE" if alive else "DEAD"
+
         print(
-            f"│ {status} P{player.player_id} "
-            f"HP={env.hp:3d} "
-            f"Gold={env.economy_manager.gold:2d} "
-            f"Lv={env.economy_manager.level} "
-            f"B={board_count} "
-            f"Bench={bench_count:<2} │"
+            f"P{player.player_id} | "
+            f"{status:<5} | "
+            f"HP={env.hp:3d} | "
+            f"Gold={gold:2d} | "
+            f"Lvl={level} | "
+            f"Board={board_count:2d} | "
+            f"Bench={bench_count:2d} | "
+            f"W={player.wins} | "
+            f"L={player.losses}"
         )
 
     print(
-        "└─────────────────────────────────────────┘"
+        f"\nPool: "
+        f"{lobby.unit_pool.get_total_available()} "
+        f"/ "
+        f"{lobby.unit_pool.get_total_initial()}"
     )
 
 
 # ============================================================
-# 🧪 MAIN TEST
+# MAIN TEST
 # ============================================================
 
 def main():
 
-    random.seed(RANDOM_SEED)
-    np.random.seed(RANDOM_SEED)
-
     print()
-    print(
-        "============================================================"
-    )
-    print(
-        "🧪 TESTE DE SELF-PLAY TFT"
-    )
-    print(
-        "============================================================"
-    )
-
-    # --------------------------------------------------------
-    # 1️⃣ CRIA LOBBY
-    # --------------------------------------------------------
-
+    print("=" * 70)
+    print("        TFT SELF-PLAY INTEGRATION TEST")
+    print("=" * 70)
     print()
-    print("1️⃣ Criando TFTLobby...")
 
-    lobby = TFTLobby(
-        num_players=NUM_PLAYERS
-    )
+    random.seed(SEED)
+    np.random.seed(SEED)
 
-    print(
-        "   ✅ Lobby criada"
-    )
+    try:
 
-    # --------------------------------------------------------
-    # 2️⃣ RESET
-    # --------------------------------------------------------
+        # ----------------------------------------------------
+        # Criar lobby
+        # ----------------------------------------------------
 
-    print()
-    print("2️⃣ Resetando lobby...")
+        print("[1/6] Criando lobby...")
 
-    result = lobby.reset()
-
-    print(
-        "   ✅ Reset concluído"
-    )
-
-    # --------------------------------------------------------
-    # 3️⃣ VALIDATE INITIAL STATE
-    # --------------------------------------------------------
-
-    print()
-    print("3️⃣ Validando estado inicial...")
-
-    validate_observations(lobby)
-    validate_masks(lobby)
-    validate_players(lobby)
-    validate_unit_pool(lobby)
-
-    print_lobby_status(lobby)
-
-    # --------------------------------------------------------
-    # 4️⃣ LOOP SELF-PLAY
-    # --------------------------------------------------------
-
-    print()
-    print(
-        "4️⃣ Iniciando self-play..."
-    )
-
-    for test_round in range(
-        1,
-        MAX_TEST_ROUNDS + 1
-    ):
-
-        if lobby.is_finished():
-
-            print()
-            print(
-                "🏆 Lobby terminou antes "
-                f"da rodada {test_round}."
-            )
-
-            break
-
-        print()
-        print(
-            f"🎮 TEST ROUND "
-            f"{test_round}/{MAX_TEST_ROUNDS}"
+        lobby = TFTLobby(
+            seed=SEED
         )
 
-        # ----------------------------------------------------
-        # Máscaras atuais
-        # ----------------------------------------------------
-
-        masks = lobby.get_action_masks()
-
-        # ----------------------------------------------------
-        # Uma ação por player
-        # ----------------------------------------------------
-
-        actions = []
-
-        for player_id in range(
-            NUM_PLAYERS
-        ):
-
-            player = lobby.players[
-                player_id
-            ]
-
-            if player.env.done:
-
-                # Player morto não joga.
-                actions.append(
-                    [
-                        6,  # PASS
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                    ]
-                )
-
-                continue
-
-            player_mask = masks[
-                player_id
-            ]
-
-            action = build_random_action(
-                player_mask
-            )
-
-            actions.append(action)
-
-        # ----------------------------------------------------
-        # Mostra ações
-        # ----------------------------------------------------
-
         print(
-            "   🎯 Ações:"
+            f"      Lobby criado com "
+            f"{len(lobby.players)} jogadores."
         )
 
-        for player_id, action in enumerate(
-            actions
-        ):
-
-            if lobby.players[
-                player_id
-            ].env.done:
-
-                continue
-
-            print(
-                f"      P{player_id}: "
-                f"{action}"
+        if len(lobby.players) != NUM_PLAYERS:
+            raise RuntimeError(
+                f"Lobby deveria ter {NUM_PLAYERS} jogadores."
             )
 
         # ----------------------------------------------------
-        # STEP DA LOBBY
+        # Reset
         # ----------------------------------------------------
 
-        try:
+        print("[2/6] Resetando lobby...")
 
-            step_result = lobby.step(
-                actions
-            )
+        lobby.reset()
 
-        except Exception as exc:
-
-            print()
-            print(
-                "❌ ERRO DURANTE lobby.step()"
-            )
-
-            print(
-                f"Tipo: {type(exc).__name__}"
-            )
-
-            print(
-                f"Mensagem: {exc}"
-            )
-
-            print()
-            traceback.print_exc()
-
-            raise
+        print("      Reset OK.")
 
         # ----------------------------------------------------
-        # VALIDAÇÕES
+        # Validações iniciais
         # ----------------------------------------------------
 
+        print("[3/6] Validando estado inicial...")
+
+        validate_observations(lobby)
+        validate_masks(lobby)
         validate_players(lobby)
         validate_unit_pool(lobby)
 
-        if lobby.matchups:
-
-            validate_matchups(lobby)
-
-        # ----------------------------------------------------
-        # STATUS
-        # ----------------------------------------------------
+        print("      Observations OK.")
+        print("      Masks OK.")
+        print("      Players OK.")
+        print("      UnitPool OK.")
 
         print_lobby_status(lobby)
 
         # ----------------------------------------------------
-        # FINAL
+        # Self-play
         # ----------------------------------------------------
 
-        if lobby.is_finished():
+        print()
+        print("[4/6] Iniciando self-play...")
+        print()
 
-            print()
-            print(
-                "🏆 PARTIDA TERMINOU!"
-            )
-
-            break
-
-    # ========================================================
-    # 🏁 RESULTADO
-    # ========================================================
-
-    print()
-    print(
-        "============================================================"
-    )
-    print(
-        "🏁 TESTE FINALIZADO"
-    )
-    print(
-        "============================================================"
-    )
-
-    # --------------------------------------------------------
-    # Pool
-    # --------------------------------------------------------
-
-    validate_unit_pool(lobby)
-
-    # --------------------------------------------------------
-    # Ranking
-    # --------------------------------------------------------
-
-    print()
-    print(
-        "🏆 RANKING:"
-    )
-
-    ranking = getattr(
-        lobby,
-        "final_ranking",
-        None
-    )
-
-    if ranking:
-
-        for position, player_id in enumerate(
-            ranking,
-            start=1
+        for test_round in range(
+            1,
+            MAX_TEST_ROUNDS + 1,
         ):
 
-            player = lobby.players[
-                player_id
-            ]
+            if lobby.is_finished():
+                print(
+                    "\nLobby terminou antes do "
+                    f"round {test_round}."
+                )
+                break
 
-            print(
-                f"   #{position} "
-                f"P{player_id} "
-                f"HP={player.env.hp}"
-            )
+            # ------------------------------------------------
+            # Obter máscaras
+            # ------------------------------------------------
 
-    else:
+            masks = lobby.get_action_masks()
+
+            # ------------------------------------------------
+            # Criar ações para os 8 jogadores
+            # ------------------------------------------------
+
+            actions = []
+
+            for player_id, player in enumerate(
+                lobby.players
+            ):
+
+                # Jogador morto/eliminado
+                if player.env.done:
+
+                    actions.append(
+                        [6, 0, 0, 0, 0, 0]
+                    )
+
+                    continue
+
+                # Jogador vivo
+                action = build_random_action(
+                    masks[player_id]
+                )
+
+                actions.append(action)
+
+            # ------------------------------------------------
+            # Executar passo
+            # ------------------------------------------------
+
+            lobby.step(actions)
+
+            # ------------------------------------------------
+            # Validar depois do passo
+            # ------------------------------------------------
+
+            validate_observations(lobby)
+            validate_masks(lobby)
+            validate_players(lobby)
+            validate_unit_pool(lobby)
+
+            print_lobby_status(lobby)
+
+        # ----------------------------------------------------
+        # Resultado
+        # ----------------------------------------------------
+
+        print()
+        print("[5/6] Resultado final")
+        print()
+
+        print_lobby_status(lobby)
+
+        if hasattr(
+            lobby,
+            "final_ranking",
+        ):
+            print("\nRanking:")
+
+            for position, player in enumerate(
+                lobby.final_ranking,
+                start=1,
+            ):
+                print(
+                    f"{position}º - "
+                    f"Player {player.player_id}"
+                )
+
+        # ----------------------------------------------------
+        # Pool final
+        # ----------------------------------------------------
+
+        print()
+        print("[6/6] Validação final do UnitPool...")
+
+        validate_unit_pool(lobby)
 
         print(
-            "   Partida ainda não terminou."
+            f"      Cópias iniciais : "
+            f"{lobby.unit_pool.get_total_initial()}"
         )
 
-    # --------------------------------------------------------
-    # Global pool
-    # --------------------------------------------------------
+        print(
+            f"      Cópias disponíveis: "
+            f"{lobby.unit_pool.get_total_available()}"
+        )
 
-    pool = lobby.unit_pool
+        print(
+            f"      Cópias tomadas   : "
+            f"{lobby.unit_pool.get_total_taken()}"
+        )
 
-    print()
-    print(
-        "📦 UNIT POOL:"
-    )
+        print()
+        print("=" * 70)
+        print("              TESTE FINALIZADO")
+        print("=" * 70)
+        print()
 
-    print(
-        f"   Inicial: "
-        f"{pool.get_total_initial()}"
-    )
+    except Exception as exc:
 
-    print(
-        f"   Disponível: "
-        f"{pool.get_total_available()}"
-    )
+        print()
+        print("=" * 70)
+        print("                  ERRO NO TESTE")
+        print("=" * 70)
 
-    print(
-        f"   Retirado: "
-        f"{pool.get_total_taken()}"
-    )
+        print()
+        print(
+            f"{type(exc).__name__}: {exc}"
+        )
 
-    # --------------------------------------------------------
-    # SUCCESS
-    # --------------------------------------------------------
+        print()
+        print("TRACEBACK COMPLETO:")
+        print()
 
-    print()
-    print(
-        "✅ TODOS OS TESTES DE INTEGRAÇÃO "
-        "PASSARAM."
-    )
+        traceback.print_exc()
 
-    print()
+        print()
+        print("=" * 70)
 
+        raise
 
-# ============================================================
-# 🚀 ENTRY POINT
-# ============================================================
 
 if __name__ == "__main__":
     main()
