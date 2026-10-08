@@ -1041,7 +1041,9 @@ class MiniTFTEnv:
 
         result = (
             self.economy_manager
-            .resolve_round()
+            .resolve_round(
+                self.round
+            )
         )
 
         self.round_action_count = 0

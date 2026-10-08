@@ -1,30 +1,24 @@
-# economy/EconomyManager.py
-
 from config.GameConfig import GameConfig
 
 
 class EconomyManager:
     """
-    💰 Gerencia a economia de um único jogador.
+    💰 Economia de um único jogador.
 
     Responsabilidades:
         - gold
         - XP
         - level
         - juros
-        - ganho de gold
-        - compra de XP
+        - renda
         - streak
-        - controle econômico por round
+        - compra de XP
 
-    NÃO é responsabilidade:
-        - board
-        - bench
+    Não controla:
         - shop
-        - UnitPool
+        - pool
+        - board
         - combate
-        - estratégia
-        - reward
     """
 
     def __init__(self):
@@ -35,12 +29,10 @@ class EconomyManager:
     # =============================================================
 
     def reset(self):
-        """Reseta a economia do jogador."""
-
         self.gold = GameConfig.STARTING_GOLD
 
-        self.level = 1
-        self.xp = 0
+        self.level = GameConfig.STARTING_LEVEL
+        self.xp = GameConfig.STARTING_XP
 
         self.win_streak = 0
         self.loss_streak = 0
@@ -48,37 +40,29 @@ class EconomyManager:
         self.round_gold = 0
         self.round_interest = 0
         self.round_streak_gold = 0
+        self.round_base_gold = 0
+        self.round_win_gold = 0
 
     # =============================================================
     # 💰 GOLD
     # =============================================================
 
     def add_gold(self, amount):
-        """Adiciona gold ao jogador."""
-
-        amount = max(
-            0,
-            int(amount)
-        )
+        amount = max(0, int(amount))
 
         self.gold += amount
 
         return amount
 
     def can_spend(self, amount):
-        """Verifica se o jogador possui gold suficiente."""
+        amount = int(amount)
 
-        return (
-            self.gold >= amount
-        )
+        if amount < 0:
+            return False
+
+        return self.gold >= amount
 
     def spend_gold(self, amount):
-        """
-        Gasta gold.
-
-        Retorna False caso não tenha gold suficiente.
-        """
-
         amount = int(amount)
 
         if amount < 0:
@@ -92,29 +76,29 @@ class EconomyManager:
         return True
 
     # =============================================================
-    # 📈 JUROS
+    # 🏦 JUROS
     # =============================================================
 
-    def get_interest(self):
+    def get_interest(self, gold=None):
         """
-        Calcula o gold de juros.
+        Calcula juros com base no gold armazenado.
 
-        TFT utiliza 1 gold por cada 10 gold guardados,
-        limitado a 5.
-
-        Exemplo:
-
-            0-9   -> 0
-            10-19 -> 1
-            20-29 -> 2
-            30-39 -> 3
-            40-49 -> 4
-            50+   -> 5
+        0-9   -> 0
+        10-19 -> 1
+        20-29 -> 2
+        30-39 -> 3
+        40-49 -> 4
+        50+   -> 5
         """
+
+        if gold is None:
+            gold = self.gold
+
+        gold = max(0, int(gold))
 
         return min(
-            self.gold // 10,
-            5
+            gold // 10,
+            GameConfig.MAX_INTEREST,
         )
 
     # =============================================================
@@ -122,31 +106,18 @@ class EconomyManager:
     # =============================================================
 
     def register_win(self):
-        """Registra uma vitória."""
-
         self.win_streak += 1
         self.loss_streak = 0
 
     def register_loss(self):
-        """Registra uma derrota."""
-
         self.loss_streak += 1
         self.win_streak = 0
 
     def reset_streak(self):
-        """Reseta as duas streaks."""
-
         self.win_streak = 0
         self.loss_streak = 0
 
     def get_streak(self):
-        """
-        Retorna a streak atual.
-
-        Positivo = vitória
-        Negativo = derrota
-        """
-
         if self.win_streak > 0:
             return self.win_streak
 
@@ -155,57 +126,24 @@ class EconomyManager:
 
         return 0
 
-    # =============================================================
-    # 💵 GOLD DE STREAK
-    # =============================================================
-
     def get_streak_gold(self):
-        """
-        Calcula gold adicional proveniente da streak.
-
-        Mantemos simples por enquanto.
-
-        2-3 = +1
-        4-5 = +2
-        6+  = +3
-        """
-
-        streak = abs(
+        return GameConfig.get_streak_gold(
             self.get_streak()
         )
-
-        if streak < 2:
-            return 0
-
-        if streak <= 3:
-            return 1
-
-        if streak <= 5:
-            return 2
-
-        return 3
 
     # =============================================================
     # ⭐ XP
     # =============================================================
 
     def get_xp_to_next(self):
-        """
-        Retorna XP necessário para o próximo nível.
-        """
-
         if self.level >= GameConfig.MAX_LEVEL:
-            return 999
+            return 0
 
         return GameConfig.get_xp_to_next(
             self.level
         )
 
     def can_buy_xp(self):
-        """
-        Verifica se é possível comprar XP.
-        """
-
         if self.level >= GameConfig.MAX_LEVEL:
             return False
 
@@ -214,24 +152,9 @@ class EconomyManager:
         )
 
     def buy_xp(self):
-        """
-        Compra XP.
-
-        Retorna:
-
-            {
-                "success": bool,
-                "xp_gained": int,
-                "leveled_up": bool,
-                "old_level": int,
-                "new_level": int
-            }
-        """
-
         old_level = self.level
 
         if not self.can_buy_xp():
-
             return {
                 "success": False,
                 "xp_gained": 0,
@@ -240,9 +163,16 @@ class EconomyManager:
                 "new_level": self.level,
             }
 
-        self.spend_gold(
+        if not self.spend_gold(
             GameConfig.BUY_XP_COST
-        )
+        ):
+            return {
+                "success": False,
+                "xp_gained": 0,
+                "leveled_up": False,
+                "old_level": old_level,
+                "new_level": self.level,
+            }
 
         self.xp += GameConfig.XP_PER_BUY
 
@@ -251,20 +181,14 @@ class EconomyManager:
         return {
             "success": True,
             "xp_gained": GameConfig.XP_PER_BUY,
-            "leveled_up": (
-                self.level > old_level
-            ),
+            "leveled_up": self.level > old_level,
             "old_level": old_level,
             "new_level": self.level,
         }
 
-    # =============================================================
-    # 📈 XP PASSIVO
-    # =============================================================
-
     def add_round_xp(self):
         """
-        Adiciona XP automático ao final do round.
+        +2 XP grátis no fim de cada round.
         """
 
         if self.level >= GameConfig.MAX_LEVEL:
@@ -278,133 +202,158 @@ class EconomyManager:
 
         return self.level > old_level
 
-    # =============================================================
-    # ⬆️ LEVEL UP
-    # =============================================================
-
     def _check_level_up(self):
         """
-        Verifica e aplica todos os level ups possíveis.
+        Aplica todos os level-ups possíveis.
+
+        XP excedente permanece para o próximo nível.
         """
 
         while self.level < GameConfig.MAX_LEVEL:
 
             required = self.get_xp_to_next()
 
+            if required <= 0:
+                break
+
             if self.xp < required:
                 break
 
             self.xp -= required
-
             self.level += 1
+
+    # =============================================================
+    # 🏆 VITÓRIA
+    # =============================================================
+
+    def register_pvp_win(self):
+        """
+        Vitória de PvP dá +1 gold.
+        """
+
+        self.register_win()
+
+        self.add_gold(
+            GameConfig.WIN_GOLD
+        )
+
+        self.round_win_gold += (
+            GameConfig.WIN_GOLD
+        )
 
     # =============================================================
     # 🌅 FINAL DO ROUND
     # =============================================================
 
-    def resolve_round(self):
+    def resolve_round(self, round_number):
         """
-        Resolve a parte econômica do final do round.
+        Resolve a economia do round.
 
-        Retorna informações para o Env/RewardManager.
+        Ordem:
 
-        IMPORTANTE:
+            1. calcula juros sobre gold guardado
+            2. adiciona renda base
+            3. adiciona streak
+            4. adiciona XP grátis
 
-        O Lobby continuará sendo responsável pelo avanço
-        global do round.
-
-        Este método apenas resolve a economia deste jogador.
+        O +1 da vitória PvP é aplicado quando o combate
+        termina, através de register_pvp_win().
         """
+
+        round_number = int(round_number)
 
         old_gold = self.gold
         old_level = self.level
 
-        # ---------------------------------------------------------
-        # 💰 Gold base
-        # ---------------------------------------------------------
+        # =========================================================
+        # 🏦 JUROS
+        # =========================================================
+        #
+        # IMPORTANTE:
+        # Calcula ANTES de adicionar a renda do round.
+        # =========================================================
 
-        passive_gold = (
-            GameConfig.PASSIVE_GOLD_PER_ROUND
+        interest = self.get_interest(
+            self.gold
         )
 
-        self.add_gold(
-            passive_gold
+        # =========================================================
+        # 💰 RENDA BASE
+        # =========================================================
+
+        base_gold = GameConfig.get_round_gold(
+            round_number
         )
 
-        # ---------------------------------------------------------
-        # 💵 Juros
-        # ---------------------------------------------------------
+        # =========================================================
+        # 🔥 STREAK
+        # =========================================================
 
-        interest = self.get_interest()
+        streak_gold = self.get_streak_gold()
 
-        self.add_gold(
-            interest
-        )
+        # =========================================================
+        # 💵 APLICA GOLD
+        # =========================================================
 
-        # ---------------------------------------------------------
-        # 🔥 Streak
-        # ---------------------------------------------------------
+        self.add_gold(base_gold)
+        self.add_gold(interest)
+        self.add_gold(streak_gold)
 
-        streak_gold = (
-            self.get_streak_gold()
-        )
-
-        self.add_gold(
-            streak_gold
-        )
-
-        # ---------------------------------------------------------
-        # 📈 XP
-        # ---------------------------------------------------------
+        # =========================================================
+        # ⭐ XP
+        # =========================================================
 
         leveled_up = self.add_round_xp()
 
-        # ---------------------------------------------------------
-        # 📊 Estatísticas do round
-        # ---------------------------------------------------------
+        # =========================================================
+        # 📊 ESTATÍSTICAS
+        # =========================================================
+
+        self.round_base_gold = base_gold
+        self.round_interest = interest
+        self.round_streak_gold = streak_gold
 
         self.round_gold = (
             self.gold - old_gold
         )
 
-        self.round_interest = interest
-
-        self.round_streak_gold = (
-            streak_gold
-        )
-
         return {
+            "round": round_number,
+
             "old_gold": old_gold,
             "new_gold": self.gold,
 
-            "passive_gold": passive_gold,
+            "base_gold": base_gold,
+            "passive_gold": base_gold,
+
             "interest_gold": interest,
             "streak_gold": streak_gold,
+            "win_gold": self.round_win_gold,
 
             "total_gold": (
-                passive_gold
+                base_gold
                 + interest
                 + streak_gold
+                + self.round_win_gold
             ),
 
             "old_level": old_level,
             "new_level": self.level,
+
             "leveled_up": leveled_up,
 
             "xp": self.xp,
+            "xp_to_next": self.get_xp_to_next(),
         }
 
     # =============================================================
-    # 📊 ESTADO
+    # 📊 STATE
     # =============================================================
 
     def get_state(self):
-        """
-        Retorna estado econômico para debug/observation.
-        """
-
         return {
             "gold": self.gold,
+
             "level": self.level,
             "xp": self.xp,
             "xp_to_next": self.get_xp_to_next(),
@@ -422,37 +371,38 @@ class EconomyManager:
     # =============================================================
 
     def debug_print(self):
-        """Imprime o estado econômico."""
+        print()
+        print("=" * 45)
+        print("💰 ECONOMY")
+        print("=" * 45)
 
         print(
-            "\n========== ECONOMY =========="
+            f"Gold       : {self.gold}"
         )
 
         print(
-            f"💰 Gold: {self.gold}"
+            f"Level      : {self.level}"
         )
 
         print(
-            f"⭐ Level: {self.level}"
+            f"XP         : "
+            f"{self.xp}/{self.get_xp_to_next()}"
         )
 
         print(
-            f"📈 XP: {self.xp}/"
-            f"{self.get_xp_to_next()}"
+            f"Win streak : {self.win_streak}"
         )
 
         print(
-            f"🔥 Win streak: {self.win_streak}"
+            f"Loss streak: {self.loss_streak}"
         )
 
         print(
-            f"💀 Loss streak: {self.loss_streak}"
+            f"Interest   : {self.get_interest()}"
         )
 
         print(
-            f"🏦 Interest: {self.get_interest()}"
+            f"Streak gold: {self.get_streak_gold()}"
         )
 
-        print(
-            "============================="
-        )
+        print("=" * 45)

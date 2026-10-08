@@ -15,6 +15,18 @@ SEED = 42
 MAX_TEST_ROUNDS = 30
 NUM_PLAYERS = 8
 
+# Mostra as ações escolhidas pelos jogadores.
+SHOW_ACTIONS = True
+
+# Mostra a composição da shop.
+SHOW_SHOP = True
+
+# Mostra detalhes econômicos.
+SHOW_ECONOMY = True
+
+# Mostra detalhes do pool.
+SHOW_POOL = True
+
 
 # ============================================================
 # HELPERS
@@ -34,6 +46,27 @@ def choose_from_mask(mask):
 
     return int(
         random.choice(valid.tolist())
+    )
+
+
+def action_name(action_type):
+    """
+    Converte o índice da ação para nome legível.
+    """
+
+    names = {
+        0: "BUY",
+        1: "REROLL",
+        2: "BUY_XP",
+        3: "MOVE_BENCH",
+        4: "MOVE_BOARD",
+        5: "SELL",
+        6: "PASS",
+    }
+
+    return names.get(
+        int(action_type),
+        f"UNKNOWN({action_type})"
     )
 
 
@@ -66,10 +99,11 @@ def build_random_action(masks):
 
         if type_mask is None:
             raise RuntimeError(
-                f"Máscara sem action type: {masks.keys()}"
+                f"Máscara sem action type: "
+                f"{masks.keys()}"
             )
 
-        action_type = choose_from_mask(
+        action_type_value = choose_from_mask(
             type_mask
         )
 
@@ -110,7 +144,7 @@ def build_random_action(masks):
                 f"Esperado: 6."
             )
 
-        action_type = choose_from_mask(
+        action_type_value = choose_from_mask(
             masks[0]
         )
 
@@ -132,7 +166,7 @@ def build_random_action(masks):
     # --------------------------------------------------------
 
     action = [
-        action_type,
+        action_type_value,
         choose_from_mask(shop_mask),
         choose_from_mask(bench_mask),
         choose_from_mask(board_target_mask),
@@ -144,38 +178,19 @@ def build_random_action(masks):
 
 
 # ============================================================
-# RANKING
+# PLAYER HELPERS
 # ============================================================
 
 def get_player_id(player):
     """
-    Extrai o ID de um jogador independentemente do formato
-    retornado pelo ranking.
-
-    Pode receber:
-
-        LobbyPlayer
-        int
-        dict
+    Extrai o ID de um jogador independentemente do formato.
     """
-
-    # --------------------------------------------------------
-    # LobbyPlayer
-    # --------------------------------------------------------
 
     if hasattr(player, "player_id"):
         return player.player_id
 
-    # --------------------------------------------------------
-    # ID diretamente
-    # --------------------------------------------------------
-
     if isinstance(player, (int, np.integer)):
         return int(player)
-
-    # --------------------------------------------------------
-    # Dict
-    # --------------------------------------------------------
 
     if isinstance(player, dict):
 
@@ -188,16 +203,220 @@ def get_player_id(player):
     return str(player)
 
 
+def get_economy(player):
+    """
+    Retorna o EconomyManager do jogador.
+    """
+
+    if not hasattr(player, "env"):
+        return None
+
+    return getattr(
+        player.env,
+        "economy_manager",
+        None,
+    )
+
+
+def get_shop_units(player):
+    """
+    Retorna a shop atual do jogador.
+    """
+
+    if not hasattr(player, "env"):
+        return []
+
+    shop_manager = getattr(
+        player.env,
+        "shop_manager",
+        None,
+    )
+
+    if shop_manager is None:
+        return []
+
+    try:
+        shop = shop_manager.get_shop()
+
+        if shop is None:
+            return []
+
+        return shop
+
+    except Exception:
+        return []
+
+
+def get_unit_name(unit):
+    """
+    Extrai nome de uma unidade de forma tolerante.
+    """
+
+    if unit is None:
+        return "---"
+
+    if isinstance(unit, dict):
+
+        return (
+            unit.get("name")
+            or unit.get("characterName")
+            or unit.get("apiName")
+            or unit.get("champion_id")
+            or "UNKNOWN"
+        )
+
+    return str(unit)
+
+
+def get_unit_cost(unit):
+    """
+    Extrai custo da unidade.
+    """
+
+    if unit is None:
+        return None
+
+    if isinstance(unit, dict):
+
+        value = (
+            unit.get("cost")
+            or unit.get("tier")
+            or unit.get("price")
+        )
+
+        try:
+            return int(value)
+
+        except (TypeError, ValueError):
+            return None
+
+    return None
+
+
+def get_unit_star(unit):
+    """
+    Extrai estrela da unidade.
+    """
+
+    if unit is None:
+        return None
+
+    if isinstance(unit, dict):
+
+        value = unit.get(
+            "star",
+            unit.get(
+                "stars",
+                1
+            )
+        )
+
+        try:
+            return int(value)
+
+        except (TypeError, ValueError):
+            return None
+
+    return None
+
+
+# ============================================================
+# SHOP PRINT
+# ============================================================
+
+def format_shop(player):
+    """
+    Formata a shop:
+
+        [0] Ashe 1★ $1
+        [1] Garen 2★ $2
+        ...
+    """
+
+    shop = get_shop_units(player)
+
+    if not shop:
+        return "Shop indisponível"
+
+    result = []
+
+    for slot, unit in enumerate(shop):
+
+        if unit is None:
+            result.append(
+                f"[{slot}] ---"
+            )
+
+            continue
+
+        name = get_unit_name(unit)
+        cost = get_unit_cost(unit)
+        star = get_unit_star(unit)
+
+        cost_text = (
+            f"${cost}"
+            if cost is not None
+            else "$?"
+        )
+
+        star_text = (
+            f"{star}★"
+            if star is not None
+            else "?★"
+        )
+
+        result.append(
+            f"[{slot}] "
+            f"{name} "
+            f"{star_text} "
+            f"{cost_text}"
+        )
+
+    return " | ".join(result)
+
+
+# ============================================================
+# BOARD / BENCH
+# ============================================================
+
+def get_board_count(player):
+    """
+    Quantidade de unidades no board.
+    """
+
+    try:
+        return len(
+            player.env.board_manager
+            .get_occupied_positions()
+        )
+
+    except Exception:
+        return 0
+
+
+def get_bench_count(player):
+    """
+    Quantidade de unidades no bench.
+    """
+
+    try:
+        return len(
+            player.env.bench_manager
+            .get_occupied_slots()
+        )
+
+    except Exception:
+        return 0
+
+
+# ============================================================
+# RANKING
+# ============================================================
+
 def get_ranking(lobby):
     """
     Obtém o ranking final do lobby.
-
-    Compatível com diferentes implementações do TFTLobby.
     """
-
-    # --------------------------------------------------------
-    # final_ranking
-    # --------------------------------------------------------
 
     if hasattr(lobby, "final_ranking"):
 
@@ -206,20 +425,12 @@ def get_ranking(lobby):
         if ranking is not None:
             return ranking
 
-    # --------------------------------------------------------
-    # ranking
-    # --------------------------------------------------------
-
     if hasattr(lobby, "ranking"):
 
         ranking = lobby.ranking
 
         if ranking is not None:
             return ranking
-
-    # --------------------------------------------------------
-    # get_ranking()
-    # --------------------------------------------------------
 
     if hasattr(lobby, "get_ranking"):
 
@@ -230,14 +441,11 @@ def get_ranking(lobby):
 
     # --------------------------------------------------------
     # Fallback
-    #
-    # Ordena os jogadores pelo HP.
-    # Isso não substitui o ranking real do lobby, mas evita
-    # quebrar o teste caso a implementação ainda não possua
-    # ranking final.
     # --------------------------------------------------------
 
-    players = list(lobby.players)
+    players = list(
+        lobby.players
+    )
 
     players.sort(
         key=lambda player: (
@@ -254,15 +462,14 @@ def get_ranking(lobby):
 
 def print_ranking(lobby):
     """
-    Imprime o ranking de forma compatível com o retorno
-    atual do TFTLobby.
+    Imprime ranking final.
     """
 
     ranking = get_ranking(lobby)
 
     print()
-    print("Ranking:")
-    print("-" * 50)
+    print("🏆 RANKING FINAL")
+    print("-" * 75)
 
     if not ranking:
         print("Nenhum ranking disponível.")
@@ -276,7 +483,7 @@ def print_ranking(lobby):
         player_id = get_player_id(player)
 
         # ----------------------------------------------------
-        # Se temos o jogador real, mostra informações extras
+        # LobbyPlayer
         # ----------------------------------------------------
 
         if hasattr(player, "env"):
@@ -287,14 +494,14 @@ def print_ranking(lobby):
                 f"{position:2d}º - "
                 f"Player {player_id} | "
                 f"HP={env.hp:3d} | "
-                f"W={player.wins} | "
-                f"L={player.losses}"
+                f"W={player.wins:2d} | "
+                f"L={player.losses:2d}"
             )
 
             continue
 
         # ----------------------------------------------------
-        # Se ranking retorna apenas o ID
+        # ID
         # ----------------------------------------------------
 
         if isinstance(
@@ -304,16 +511,21 @@ def print_ranking(lobby):
 
             player_id = int(player)
 
-            # Tenta localizar o jogador real no lobby
             real_player = None
 
             if (
                 0 <= player_id
                 < len(lobby.players)
             ):
-                candidate = lobby.players[player_id]
 
-                if candidate.player_id == player_id:
+                candidate = (
+                    lobby.players[player_id]
+                )
+
+                if (
+                    candidate.player_id
+                    == player_id
+                ):
                     real_player = candidate
 
             if real_player is not None:
@@ -324,8 +536,8 @@ def print_ranking(lobby):
                     f"{position:2d}º - "
                     f"Player {player_id} | "
                     f"HP={env.hp:3d} | "
-                    f"W={real_player.wins} | "
-                    f"L={real_player.losses}"
+                    f"W={real_player.wins:2d} | "
+                    f"L={real_player.losses:2d}"
                 )
 
             else:
@@ -383,9 +595,6 @@ def print_ranking(lobby):
 # ============================================================
 
 def validate_observations(lobby):
-    """
-    Verifica se os jogadores estão produzindo observações válidas.
-    """
 
     observations = lobby.get_observations()
 
@@ -410,15 +619,20 @@ def validate_observations(lobby):
         obs = np.asarray(obs)
 
         if obs.ndim != 1:
+
             raise RuntimeError(
-                f"Player {player_id}: observation "
-                f"não é 1D: shape={obs.shape}"
+                f"Player {player_id}: "
+                f"observation não é 1D: "
+                f"shape={obs.shape}"
             )
 
-        if not np.all(np.isfinite(obs)):
+        if not np.all(
+            np.isfinite(obs)
+        ):
+
             raise RuntimeError(
-                f"Player {player_id}: observation possui "
-                f"NaN ou Inf."
+                f"Player {player_id}: "
+                f"observation possui NaN ou Inf."
             )
 
 
@@ -427,9 +641,6 @@ def validate_observations(lobby):
 # ============================================================
 
 def validate_masks(lobby):
-    """
-    Verifica as máscaras dos 8 jogadores.
-    """
 
     masks = lobby.get_action_masks()
 
@@ -439,6 +650,7 @@ def validate_masks(lobby):
         )
 
     if len(masks) != NUM_PLAYERS:
+
         raise RuntimeError(
             f"Esperado {NUM_PLAYERS} máscaras, "
             f"recebido {len(masks)}."
@@ -494,18 +706,115 @@ def validate_masks(lobby):
 
 
 # ============================================================
+# VALIDATE ECONOMY
+# ============================================================
+
+def validate_economy(lobby):
+    """
+    Valida regras básicas da economia.
+    """
+
+    for player in lobby.players:
+
+        env = player.env
+        economy = env.economy_manager
+
+        # ----------------------------------------------------
+        # Gold
+        # ----------------------------------------------------
+
+        if economy.gold < 0:
+
+            raise RuntimeError(
+                f"Player {player.player_id}: "
+                f"gold negativo: {economy.gold}"
+            )
+
+        # ----------------------------------------------------
+        # Level
+        # ----------------------------------------------------
+
+        if economy.level < GameConfig.STARTING_LEVEL:
+
+            raise RuntimeError(
+                f"Player {player.player_id}: "
+                f"level inválido: "
+                f"{economy.level}"
+            )
+
+        if economy.level > GameConfig.MAX_LEVEL:
+
+            raise RuntimeError(
+                f"Player {player.player_id}: "
+                f"level acima do máximo: "
+                f"{economy.level}"
+            )
+
+        # ----------------------------------------------------
+        # XP
+        # ----------------------------------------------------
+
+        if economy.xp < 0:
+
+            raise RuntimeError(
+                f"Player {player.player_id}: "
+                f"XP negativo."
+            )
+
+        # ----------------------------------------------------
+        # Streak
+        # ----------------------------------------------------
+
+        if economy.win_streak > 0:
+            if economy.loss_streak != 0:
+
+                raise RuntimeError(
+                    f"Player {player.player_id}: "
+                    f"win_streak e loss_streak "
+                    f"simultaneamente ativos."
+                )
+
+        if economy.loss_streak > 0:
+            if economy.win_streak != 0:
+
+                raise RuntimeError(
+                    f"Player {player.player_id}: "
+                    f"loss_streak e win_streak "
+                    f"simultaneamente ativos."
+                )
+
+        # ----------------------------------------------------
+        # Interest
+        # ----------------------------------------------------
+
+        interest = economy.get_interest()
+
+        expected_interest = min(
+            economy.gold // 10,
+            GameConfig.MAX_INTEREST,
+        )
+
+        if interest != expected_interest:
+
+            raise RuntimeError(
+                f"Player {player.player_id}: "
+                f"interest inconsistente. "
+                f"Atual={interest}, "
+                f"Esperado={expected_interest}"
+            )
+
+
+# ============================================================
 # VALIDATE PLAYERS
 # ============================================================
 
 def validate_players(lobby):
-    """
-    Verifica o estado básico dos 8 jogadores.
-    """
 
     if len(lobby.players) != NUM_PLAYERS:
 
         raise RuntimeError(
-            f"Lobby deveria possuir {NUM_PLAYERS} jogadores, "
+            f"Lobby deveria possuir "
+            f"{NUM_PLAYERS} jogadores, "
             f"possui {len(lobby.players)}."
         )
 
@@ -535,8 +844,8 @@ def validate_players(lobby):
         # BOARD
         # ----------------------------------------------------
 
-        occupied_board = len(
-            env.board_manager.get_occupied_positions()
+        occupied_board = get_board_count(
+            player
         )
 
         if occupied_board > GameConfig.BOARD_SIZE:
@@ -550,8 +859,8 @@ def validate_players(lobby):
         # BENCH
         # ----------------------------------------------------
 
-        occupied_bench = len(
-            env.bench_manager.get_occupied_slots()
+        occupied_bench = get_bench_count(
+            player
         )
 
         if occupied_bench > GameConfig.MAX_BENCH:
@@ -567,9 +876,6 @@ def validate_players(lobby):
 # ============================================================
 
 def validate_unit_pool(lobby):
-    """
-    Verifica a integridade do UnitPool global.
-    """
 
     pool = lobby.unit_pool
 
@@ -611,52 +917,246 @@ def validate_unit_pool(lobby):
 
 
 # ============================================================
+# SNAPSHOT ECONOMY
+# ============================================================
+
+def snapshot_players(lobby):
+    """
+    Guarda estado antes do round.
+
+    Usado para calcular deltas.
+    """
+
+    snapshot = {}
+
+    for player in lobby.players:
+
+        economy = player.env.economy_manager
+
+        snapshot[player.player_id] = {
+            "hp": player.env.hp,
+            "gold": economy.gold,
+            "xp": economy.xp,
+            "level": economy.level,
+            "win_streak": economy.win_streak,
+            "loss_streak": economy.loss_streak,
+            "wins": player.wins,
+            "losses": player.losses,
+        }
+
+    return snapshot
+
+
+def print_round_changes(
+    lobby,
+    previous_snapshot,
+):
+    """
+    Mostra mudanças econômicas depois do round.
+    """
+
+    print()
+    print("📈 ALTERAÇÕES DO ROUND")
+    print("-" * 110)
+
+    for player in lobby.players:
+
+        old = previous_snapshot.get(
+            player.player_id
+        )
+
+        if old is None:
+            continue
+
+        economy = player.env.economy_manager
+
+        gold_delta = (
+            economy.gold
+            - old["gold"]
+        )
+
+        xp_delta = (
+            economy.xp
+            - old["xp"]
+        )
+
+        hp_delta = (
+            player.env.hp
+            - old["hp"]
+        )
+
+        win_delta = (
+            player.wins
+            - old["wins"]
+        )
+
+        loss_delta = (
+            player.losses
+            - old["losses"]
+        )
+
+        print(
+            f"P{player.player_id} | "
+            f"Gold {old['gold']:2d} -> "
+            f"{economy.gold:2d} "
+            f"({gold_delta:+3d}) | "
+            f"XP {old['xp']:2d} -> "
+            f"{economy.xp:2d} "
+            f"({xp_delta:+3d}) | "
+            f"Lvl {old['level']} -> "
+            f"{economy.level} | "
+            f"HP {old['hp']:3d} -> "
+            f"{player.env.hp:3d} "
+            f"({hp_delta:+4d}) | "
+            f"W {old['wins']} -> "
+            f"{player.wins} "
+            f"({win_delta:+2d}) | "
+            f"L {old['losses']} -> "
+            f"{player.losses} "
+            f"({loss_delta:+2d})"
+        )
+
+
+# ============================================================
+# PRINT ACTIONS
+# ============================================================
+
+def print_actions(
+    lobby,
+    actions,
+):
+    """
+    Mostra as ações escolhidas pelos jogadores.
+    """
+
+    print()
+    print("🎲 AÇÕES")
+    print("-" * 90)
+
+    for player_id, action in enumerate(
+        actions
+    ):
+
+        player = lobby.players[player_id]
+
+        if player.env.done:
+
+            print(
+                f"P{player_id} | DEAD | PASS"
+            )
+
+            continue
+
+        action_type = action[0]
+
+        print(
+            f"P{player_id} | "
+            f"{action_name(action_type):10s} | "
+            f"shop={action[1]} | "
+            f"bench={action[2]} | "
+            f"target={action[3]} | "
+            f"source={action[4]} | "
+            f"cond={action[5]}"
+        )
+
+
+# ============================================================
+# PRINT SHOP
+# ============================================================
+
+def print_shops(lobby):
+
+    if not SHOW_SHOP:
+        return
+
+    print()
+    print("🛒 SHOPS")
+    print("-" * 120)
+
+    for player in lobby.players:
+
+        if player.env.done:
+
+            print(
+                f"P{player.player_id} | DEAD"
+            )
+
+            continue
+
+        economy = player.env.economy_manager
+
+        print(
+            f"P{player.player_id} | "
+            f"Gold={economy.gold:2d} | "
+            f"{format_shop(player)}"
+        )
+
+
+# ============================================================
+# PRINT ECONOMY DETAILS
+# ============================================================
+
+def print_economy_details(lobby):
+
+    if not SHOW_ECONOMY:
+        return
+
+    print()
+    print("💰 ECONOMIA DETALHADA")
+    print("-" * 120)
+
+    for player in lobby.players:
+
+        economy = player.env.economy_manager
+
+        streak = economy.get_streak()
+
+        if streak > 0:
+            streak_text = (
+                f"W{streak}"
+            )
+        elif streak < 0:
+            streak_text = (
+                f"L{abs(streak)}"
+            )
+        else:
+            streak_text = "0"
+
+        print(
+            f"P{player.player_id} | "
+            f"Gold={economy.gold:2d} | "
+            f"Lvl={economy.level:2d} | "
+            f"XP={economy.xp:2d}/"
+            f"{economy.get_xp_to_next():2d} | "
+            f"Interest={economy.get_interest()} | "
+            f"Streak={streak_text:>3s} | "
+            f"StreakGold="
+            f"{economy.get_streak_gold()}"
+        )
+
+
+# ============================================================
 # PRINT LOBBY STATUS
 # ============================================================
 
 def print_lobby_status(lobby):
-    """
-    Imprime um resumo da partida.
-    """
 
     print()
-    print("=" * 70)
+    print("=" * 120)
 
     print(
         f"ROUND {lobby.round} | "
         f"STAGE {lobby.stage}"
     )
 
-    print("=" * 70)
+    print("=" * 120)
 
     for player in lobby.players:
 
         env = player.env
+        economy = env.economy_manager
 
         alive = not env.done
-
-        # ----------------------------------------------------
-        # Board
-        # ----------------------------------------------------
-
-        board_count = len(
-            env.board_manager.get_occupied_positions()
-        )
-
-        # ----------------------------------------------------
-        # Bench
-        # ----------------------------------------------------
-
-        bench_count = len(
-            env.bench_manager.get_occupied_slots()
-        )
-
-        # ----------------------------------------------------
-        # Economia
-        # ----------------------------------------------------
-
-        gold = env.economy_manager.gold
-        level = env.economy_manager.level
 
         status = (
             "ALIVE"
@@ -664,28 +1164,194 @@ def print_lobby_status(lobby):
             else "DEAD"
         )
 
+        board_count = get_board_count(
+            player
+        )
+
+        bench_count = get_bench_count(
+            player
+        )
+
+        streak = economy.get_streak()
+
+        if streak > 0:
+            streak_text = f"W{streak}"
+        elif streak < 0:
+            streak_text = f"L{abs(streak)}"
+        else:
+            streak_text = "-"
+
         print(
             f"P{player.player_id} | "
             f"{status:<5} | "
             f"HP={env.hp:3d} | "
-            f"Gold={gold:2d} | "
-            f"Lvl={level} | "
+            f"Gold={economy.gold:2d} | "
+            f"Lvl={economy.level:2d} | "
+            f"XP={economy.xp:2d}/"
+            f"{economy.get_xp_to_next():2d} | "
+            f"Int={economy.get_interest()} | "
+            f"Streak={streak_text:<3} | "
             f"Board={board_count:2d} | "
             f"Bench={bench_count:2d} | "
-            f"W={player.wins} | "
-            f"L={player.losses}"
+            f"W={player.wins:2d} | "
+            f"L={player.losses:2d}"
         )
 
     # --------------------------------------------------------
     # Pool
     # --------------------------------------------------------
 
-    print(
-        f"\nPool: "
-        f"{lobby.unit_pool.get_total_available()} "
-        f"/ "
-        f"{lobby.unit_pool.get_total_initial()}"
+    if SHOW_POOL:
+
+        available = (
+            lobby.unit_pool
+            .get_total_available()
+        )
+
+        initial = (
+            lobby.unit_pool
+            .get_total_initial()
+        )
+
+        taken = (
+            lobby.unit_pool
+            .get_total_taken()
+        )
+
+        print()
+        print(
+            f"🌐 POOL | "
+            f"Disponível={available} | "
+            f"Tomadas={taken} | "
+            f"Inicial={initial}"
+        )
+
+
+# ============================================================
+# RULE VALIDATION
+# ============================================================
+
+def validate_rules(lobby):
+    """
+    Valida as regras fundamentais adicionadas nesta etapa.
+    """
+
+    # --------------------------------------------------------
+    # XP / LEVEL
+    # --------------------------------------------------------
+
+    if GameConfig.MAX_LEVEL != 10:
+
+        raise RuntimeError(
+            "MAX_LEVEL deveria ser 10."
+        )
+
+    expected_xp = {
+        2: 2,
+        3: 6,
+        4: 10,
+        5: 20,
+        6: 36,
+        7: 56,
+        8: 68,
+        9: 68,
+    }
+
+    for level, xp in expected_xp.items():
+
+        actual = (
+            GameConfig.get_xp_to_next(
+                level
+            )
+        )
+
+        if actual != xp:
+
+            raise RuntimeError(
+                f"XP inválido no level {level}: "
+                f"atual={actual}, "
+                f"esperado={xp}"
+            )
+
+    # --------------------------------------------------------
+    # SHOP ODDS
+    # --------------------------------------------------------
+
+    for level, odds in (
+        GameConfig.SHOP_ODDS.items()
+    ):
+
+        total = sum(odds)
+
+        if not np.isclose(
+            total,
+            1.0,
+            atol=1e-6,
+        ):
+
+            raise RuntimeError(
+                f"Shop odds do level {level} "
+                f"não somam 100%: {total}"
+            )
+
+    # --------------------------------------------------------
+    # POOL
+    # --------------------------------------------------------
+
+    expected_pool = {
+        1: 30,
+        2: 25,
+        3: 18,
+        4: 10,
+        5: 9,
+    }
+
+    actual_pool = getattr(
+        lobby.unit_pool,
+        "copies_by_cost",
+        None,
     )
+
+    if actual_pool is not None:
+
+        for cost, expected in (
+            expected_pool.items()
+        ):
+
+            actual = actual_pool.get(
+                cost
+            )
+
+            if actual != expected:
+
+                raise RuntimeError(
+                    f"Pool do custo {cost} "
+                    f"incorreto: "
+                    f"atual={actual}, "
+                    f"esperado={expected}"
+                )
+
+    # --------------------------------------------------------
+    # ECONOMY
+    # --------------------------------------------------------
+
+    for player in lobby.players:
+
+        economy = player.env.economy_manager
+
+        if economy.level < 2:
+
+            raise RuntimeError(
+                f"Player {player.player_id}: "
+                f"começou abaixo do level 2."
+            )
+
+        if economy.gold < 0:
+
+            raise RuntimeError(
+                f"Player {player.player_id}: "
+                f"gold negativo."
+            )
 
 
 # ============================================================
@@ -695,9 +1361,36 @@ def print_lobby_status(lobby):
 def main():
 
     print()
-    print("=" * 70)
-    print("        TFT SELF-PLAY INTEGRATION TEST")
-    print("=" * 70)
+    print("=" * 120)
+    print("                    TFT SELF-PLAY RULES TEST")
+    print("=" * 120)
+
+    print()
+    print(f"Seed           : {SEED}")
+    print(f"Players        : {NUM_PLAYERS}")
+    print(f"Max rounds     : {MAX_TEST_ROUNDS}")
+    print(f"Max level      : {GameConfig.MAX_LEVEL}")
+    print(
+        f"Pool           : "
+        f"30 / 25 / 18 / 10 / 9"
+    )
+    print(
+        f"Reroll         : "
+        f"{GameConfig.REROLL_COST} gold"
+    )
+    print(
+        f"Buy XP         : "
+        f"{GameConfig.BUY_XP_COST} gold "
+        f"→ {GameConfig.XP_PER_BUY} XP"
+    )
+    print(
+        f"Round XP       : "
+        f"+{GameConfig.XP_PER_ROUND}"
+    )
+    print(
+        f"Win gold       : "
+        f"+{GameConfig.WIN_GOLD}"
+    )
     print()
 
     # --------------------------------------------------------
@@ -752,14 +1445,21 @@ def main():
         validate_observations(lobby)
         validate_masks(lobby)
         validate_players(lobby)
+        validate_economy(lobby)
         validate_unit_pool(lobby)
+        validate_rules(lobby)
 
         print("      Observations OK.")
         print("      Masks OK.")
         print("      Players OK.")
+        print("      Economy OK.")
         print("      UnitPool OK.")
+        print("      Rules OK.")
 
         print_lobby_status(lobby)
+
+        print_economy_details(lobby)
+        print_shops(lobby)
 
         # ====================================================
         # 4. SELF-PLAY
@@ -770,6 +1470,8 @@ def main():
             "[4/6] Iniciando self-play..."
         )
         print()
+
+        rounds_completed = 0
 
         for test_round in range(
             1,
@@ -783,17 +1485,29 @@ def main():
             if lobby.is_finished():
 
                 print(
-                    "\nLobby terminou antes do "
+                    "\n🏁 Lobby terminou antes do "
                     f"round {test_round}."
                 )
 
                 break
 
             # ------------------------------------------------
+            # Snapshot ANTES do round
+            # ------------------------------------------------
+
+            previous_snapshot = (
+                snapshot_players(
+                    lobby
+                )
+            )
+
+            # ------------------------------------------------
             # Obter máscaras
             # ------------------------------------------------
 
-            masks = lobby.get_action_masks()
+            masks = (
+                lobby.get_action_masks()
+            )
 
             # ------------------------------------------------
             # Criar ações
@@ -835,25 +1549,80 @@ def main():
                 actions.append(action)
 
             # ------------------------------------------------
+            # Mostrar ações
+            # ------------------------------------------------
+
+            if SHOW_ACTIONS:
+
+                print_actions(
+                    lobby,
+                    actions,
+                )
+
+            # ------------------------------------------------
             # Executar passo
             # ------------------------------------------------
 
             lobby.step(actions)
 
+            rounds_completed += 1
+
             # ------------------------------------------------
-            # Validar depois do passo
+            # Validações
             # ------------------------------------------------
 
-            validate_observations(lobby)
-            validate_masks(lobby)
-            validate_players(lobby)
-            validate_unit_pool(lobby)
+            validate_observations(
+                lobby
+            )
+
+            validate_masks(
+                lobby
+            )
+
+            validate_players(
+                lobby
+            )
+
+            validate_economy(
+                lobby
+            )
+
+            validate_unit_pool(
+                lobby
+            )
+
+            validate_rules(
+                lobby
+            )
 
             # ------------------------------------------------
             # Status
             # ------------------------------------------------
 
-            print_lobby_status(lobby)
+            print_lobby_status(
+                lobby
+            )
+
+            # ------------------------------------------------
+            # Economia
+            # ------------------------------------------------
+
+            print_round_changes(
+                lobby,
+                previous_snapshot,
+            )
+
+            print_economy_details(
+                lobby
+            )
+
+            # ------------------------------------------------
+            # Shop
+            # ------------------------------------------------
+
+            print_shops(
+                lobby
+            )
 
         # ====================================================
         # 5. RESULTADO FINAL
@@ -863,15 +1632,24 @@ def main():
         print(
             "[5/6] Resultado final"
         )
-        print()
 
-        print_lobby_status(lobby)
+        print()
+        print(
+            f"Rounds executados: "
+            f"{rounds_completed}"
+        )
+
+        print_lobby_status(
+            lobby
+        )
 
         # ----------------------------------------------------
         # Ranking
         # ----------------------------------------------------
 
-        print_ranking(lobby)
+        print_ranking(
+            lobby
+        )
 
         # ====================================================
         # 6. UNIT POOL FINAL
@@ -882,21 +1660,44 @@ def main():
             "[6/6] Validação final do UnitPool..."
         )
 
-        validate_unit_pool(lobby)
+        validate_unit_pool(
+            lobby
+        )
 
+        available = (
+            lobby.unit_pool
+            .get_total_available()
+        )
+
+        initial = (
+            lobby.unit_pool
+            .get_total_initial()
+        )
+
+        taken = (
+            lobby.unit_pool
+            .get_total_taken()
+        )
+
+        print()
         print(
-            f"      Cópias iniciais   : "
-            f"{lobby.unit_pool.get_total_initial()}"
+            f"      Cópias iniciais    : "
+            f"{initial}"
         )
 
         print(
-            f"      Cópias disponíveis: "
-            f"{lobby.unit_pool.get_total_available()}"
+            f"      Cópias disponíveis : "
+            f"{available}"
         )
 
         print(
-            f"      Cópias tomadas    : "
-            f"{lobby.unit_pool.get_total_taken()}"
+            f"      Cópias tomadas     : "
+            f"{taken}"
+        )
+
+        print(
+            f"      Integridade        : "
+            f"{'OK' if available + taken == initial else 'ERRO'}"
         )
 
         # ====================================================
@@ -904,17 +1705,17 @@ def main():
         # ====================================================
 
         print()
-        print("=" * 70)
-        print("              TESTE FINALIZADO")
-        print("=" * 70)
+        print("=" * 120)
+        print("                    TESTE FINALIZADO")
+        print("=" * 120)
         print()
 
     except Exception as exc:
 
         print()
-        print("=" * 70)
-        print("                  ERRO NO TESTE")
-        print("=" * 70)
+        print("=" * 120)
+        print("                         ERRO NO TESTE")
+        print("=" * 120)
 
         print()
 
@@ -929,7 +1730,7 @@ def main():
         traceback.print_exc()
 
         print()
-        print("=" * 70)
+        print("=" * 120)
 
         raise
 

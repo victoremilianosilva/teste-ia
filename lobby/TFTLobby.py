@@ -935,7 +935,6 @@ class TFTLobby:
         # --------------------------------------------------------
         # 🧠 APPLY RESULT
         # --------------------------------------------------------
-
         winner.wins += 1
         loser.losses += 1
 
@@ -947,6 +946,11 @@ class TFTLobby:
         loser.env.apply_combat_result(
             result,
             won=False,
+        )
+
+        # 🪙 Vitória PvP = +1 gold
+        winner.env.economy_manager.add_gold(
+            GameConfig.WIN_GOLD
         )
 
         # --------------------------------------------------------
@@ -1124,7 +1128,6 @@ class TFTLobby:
     # ============================================================
     # ❤️ DAMAGE
     # ============================================================
-
     def _calculate_damage(
         self,
         loser_env,
@@ -1132,81 +1135,40 @@ class TFTLobby:
         loser_power,
         winner_units,
     ):
+        """
+        💥 Calcula o dano de jogador.
 
-        stage = max(
-            1,
-            min(
-                self.stage,
-                7,
-            ),
+        TFT:
+
+            dano = dano_base_do_estágio
+                + unidades_inimigas_sobreviventes
+
+        winner_power / loser_power são mantidos na assinatura
+        somente por compatibilidade com o restante do lobby.
+
+        Eles NÃO participam do dano.
+        """
+
+        del winner_power
+        del loser_power
+
+        base_damage = GameConfig.get_stage_damage(
+            self.stage
         )
-
-        base_damage = (
-            GameConfig.STAGE_DAMAGE
-            .get(
-                stage,
-                1,
-            )
-        )
-
-        if base_damage <= 0:
-
-            base_damage = 1
-
-        # --------------------------------------------------------
-        # POWER DIFFERENCE
-        # --------------------------------------------------------
-
-        if loser_power <= 0:
-
-            ratio = 1.0
-
-        else:
-
-            ratio = (
-                winner_power
-                / max(
-                    1.0,
-                    loser_power,
-                )
-            )
-
-        extra_power = max(
-            0.0,
-            ratio - 1.0,
-        )
-
-        extra = int(
-            min(
-                8.0,
-                extra_power * 3.0,
-            )
-        )
-
-        # --------------------------------------------------------
-        # SURVIVING UNITS
-        # --------------------------------------------------------
 
         survivors = max(
             0,
-            min(
-                5,
-                int(winner_units),
-            ),
+            int(winner_units),
         )
 
         damage = (
             base_damage
-            + extra
-            + max(
-                0,
-                survivors - 1,
-            )
+            + survivors
         )
 
         return max(
-            1,
-            damage,
+            0,
+            int(damage),
         )
 
     # ============================================================

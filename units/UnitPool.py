@@ -56,11 +56,11 @@ class UnitPool:
             dict(copies_by_cost)
             if copies_by_cost is not None
             else {
-                1: 29,
-                2: 22,
+                1: 30,
+                2: 25,
                 3: 18,
-                4: 12,
-                5: 10,
+                4: 10,
+                5: 9,
             }
         )
 
