@@ -34,6 +34,28 @@ from combat.CombatProfileManager import (
 )
 
 
+import sys
+from pathlib import Path
+
+# Localiza o módulo compilado pelo CMake no Windows.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_CPP_BUILD_DIRS = [
+    _REPO_ROOT / "cpp" / "build" / "bin" / "Release",
+    _REPO_ROOT / "cpp" / "build" / "bin",
+]
+
+for _build_dir in _CPP_BUILD_DIRS:
+    if _build_dir.exists() and str(_build_dir) not in sys.path:
+        sys.path.insert(0, str(_build_dir))
+
+try:
+    import combat_engine
+except ImportError as exc:
+    raise ImportError(
+        "Não foi possível importar combat_engine. "
+        "Compile o módulo C++ e confira cpp/build/bin/Release."
+    ) from exc
+
 # ============================================================
 # ⚔️ COMBAT RESULT
 # ============================================================
@@ -823,93 +845,224 @@ class TFTLobby:
     # ============================================================
     # ⚔️ COMBAT
     # ============================================================
+    def _build_cpp_combat_input(self, player_a, player_b):
+        """Converte os dois tabuleiros para CombatInput do C++."""
 
-    def resolve_combat(
-        self,
-        player_a,
-        player_b,
-    ):
+        combat_input = combat_engine.CombatInput()
+        combat_input.context = combat_engine.CombatContext.PVP
 
-        units_a = self._get_alive_units(
-            player_a.env
-        )
+        config = combat_engine.CombatConfig()
+        config.board_rows = GameConfig.BOARD_ROWS
+        config.board_cols = GameConfig.BOARD_COLS
+        config.max_duration = 30.0
+        config.max_events = 100_000
+        config.deterministic = True
+        config.seed = int(self.seed or 0)
 
-        units_b = self._get_alive_units(
-            player_b.env
-        )
+        # Registro detalhado pode ser ativado durante depuração.
+        config.record_events = False
+        config.record_damage = False
+        config.record_positions = False
 
-        power_a = self._calculate_board_power(
-            player_a.env
-        )
+        combat_input.seed = int(self.seed or 0)
+        combat_input.config = config
 
-        power_b = self._calculate_board_power(
-            player_b.env
-        )
+        team_specs = [
+            (player_a, combat_engine.UnitTeam.PLAYER_A),
+            (player_b, combat_engine.UnitTeam.PLAYER_B),
+        ]
 
-        # --------------------------------------------------------
-        # 🥊 WINNER
-        # --------------------------------------------------------
+        next_unit_id = 0
 
-        if abs(power_a - power_b) < 0.0001:
+        for player, cpp_team_type in team_specs:
+            cpp_team = combat_engine.CombatTeam()
+            cpp_team.team = cpp_team_type
+            cpp_team.player_id = int(player.player_id)
+            cpp_team.player_hp = float(player.env.hp)
 
-            # Pequeno desempate.
-            if len(units_a) > len(units_b):
+            cpp_units = []
 
-                winner = player_a
-                loser = player_b
+            board = player.env.board_manager.board
 
-            elif len(units_b) > len(units_a):
+            for board_position, unit in enumerate(board):
+                if unit is None:
+                    continue
 
-                winner = player_b
-                loser = player_a
+                profile = unit.get("combat_profile") or {}
 
+                # O perfil pode conter os atributos mesmo quando a instância
+                # da unidade guarda apenas identidade, estrela e UUID.
+                max_hp = float(
+                    profile.get("max_hp")
+                    or unit.get("max_hp")
+                    or unit.get("hp")
+                    or 100.0
+                )
+
+                hp = float(unit.get("hp") or max_hp)
+
+                attack_damage = float(
+                    profile.get("attack_damage")
+                    or unit.get("attack_damage")
+                    or unit.get("ad")
+                    or 30.0
+                )
+
+                attack_speed = float(
+                    profile.get("attack_speed")
+                    or unit.get("attack_speed")
+                    or 1.0
+                )
+
+                attack_range = float(
+                    profile.get("attack_range")
+                    or unit.get("attack_range")
+                    or 1.0
+                )
+
+                armor = float(
+                    profile.get("armor")
+                    or unit.get("armor")
+                    or 0.0
+                )
+
+                magic_resist = float(
+                    profile.get("magic_resist")
+                    or unit.get("magic_resist")
+                    or unit.get("mr")
+                    or 0.0
+                )
+
+                # O tabuleiro Python usa índice linear: linha * colunas + coluna.
+                y, x = divmod(board_position, GameConfig.BOARD_COLS)
+
+                # Espelha o lado B para posicionar as equipes frente a frente.
+                if cpp_team_type == combat_engine.UnitTeam.PLAYER_B:
+                    x = GameConfig.BOARD_COLS - 1 - x
+
+                cpp_unit = combat_engine.CombatUnit()
+                cpp_unit.id = next_unit_id
+                cpp_unit.api_name = str(unit.get("champion_id", unit.get("id", "")))
+                cpp_unit.name = str(unit.get("name", "Unknown"))
+                cpp_unit.star = int(unit.get("star", 1))
+                cpp_unit.team = cpp_team_type
+
+                role_by_id = {
+                    0: combat_engine.UnitRole.TANK,
+                    1: combat_engine.UnitRole.CARRY,
+                    2: combat_engine.UnitRole.SUPPORT,
+                    3: combat_engine.UnitRole.FIGHTER,
+                    4: combat_engine.UnitRole.ASSASSIN,
+                }
+
+                cpp_unit.role = role_by_id.get(
+                    int(unit.get("role", 3)),
+                    combat_engine.UnitRole.FIGHTER,
+                )
+
+                position = combat_engine.CombatPosition()
+                position.x = x
+                position.y = y
+                cpp_unit.position = position
+
+                cpp_unit.max_hp = max(1.0, max_hp)
+                cpp_unit.hp = min(max(1.0, hp), cpp_unit.max_hp)
+                cpp_unit.attack_damage = max(1.0, attack_damage)
+                cpp_unit.attack_speed = max(0.1, attack_speed)
+                cpp_unit.attack_range = max(1.0, attack_range)
+                cpp_unit.armor = armor
+                cpp_unit.magic_resist = magic_resist
+
+                cpp_unit.alive = True
+                cpp_unit.can_move = True
+                cpp_unit.can_attack = True
+                cpp_unit.can_cast = True
+                cpp_unit.source_board_position = board_position
+
+                cpp_units.append(cpp_unit)
+
+                # IMPORTANTE: atribui o vetor completo ao objeto C++.
+                cpp_team.units = cpp_units
+                next_unit_id += 1
+
+            if cpp_team_type == combat_engine.UnitTeam.PLAYER_A:
+                combat_input.player_a = cpp_team
             else:
+                combat_input.player_b = cpp_team
 
-                # Evita empate infinito.
-                if random.random() < 0.5:
+        return combat_input
+  
+    def resolve_combat(self, player_a, player_b):
+        # 1. Monta a entrada e executa o motor C++.
+        combat_input = self._build_cpp_combat_input(
+            player_a,
+            player_b,
+        )
 
-                    winner = player_a
-                    loser = player_b
+        cpp_result = combat_engine.simulate(combat_input)
 
-                else:
+        if not cpp_result.success:
+            raise RuntimeError(
+                f"Falha no motor C++: "
+                f"{cpp_result.error_code}: "
+                f"{cpp_result.error_message}"
+            )
 
-                    winner = player_b
-                    loser = player_a
+        if not cpp_result.completed:
+            raise RuntimeError(
+                "O motor C++ aceitou a entrada, "
+                "mas não concluiu a simulação."
+            )
 
-        elif power_a > power_b:
+        # Mantém esses valores apenas para compatibilidade com o
+        # CombatResult Python e para observabilidade durante a migração.
+        power_a = self._calculate_board_power(player_a.env)
+        power_b = self._calculate_board_power(player_b.env)
 
+        survivors_a = int(cpp_result.player_a_survivors)
+        survivors_b = int(cpp_result.player_b_survivors)
+
+        # 2. Resolve o vencedor exclusivamente pelo resultado do C++.
+        if cpp_result.winner == combat_engine.CombatWinner.PLAYER_A:
             winner = player_a
             loser = player_b
+            winner_units = survivors_a
+            loser_units = survivors_b
+            winner_power = power_a
+            loser_power = power_b
 
-        else:
-
+        elif cpp_result.winner == combat_engine.CombatWinner.PLAYER_B:
             winner = player_b
             loser = player_a
+            winner_units = survivors_b
+            loser_units = survivors_a
+            winner_power = power_b
+            loser_power = power_a
 
-        winner_power = (
-            power_a
-            if winner.player_id == player_a.player_id
-            else power_b
-        )
+        else:
+            # Empate real: ninguém recebe dano de jogador nem ouro de vitória.
+            result = CombatResult(
+                winner_id=None,
+                loser_id=None,
+                winner_units=survivors_a,
+                loser_units=survivors_b,
+                damage=0,
+                winner_power=power_a,
+                loser_power=power_b,
+                draw=True,
+            )
 
-        loser_power = (
-            power_b
-            if winner.player_id == player_a.player_id
-            else power_a
-        )
+            for player in (player_a, player_b):
+                player.last_combat_result = result
+                player.last_damage_taken = 0
+                player.env.last_combat_result = result
+                player.env.last_combat_won = False
+                player.env._rebuild_player_state()
 
-        winner_units = (
-            len(units_a)
-            if winner.player_id == player_a.player_id
-            else len(units_b)
-        )
+            return result
 
-        loser_units = (
-            len(units_b)
-            if winner.player_id == player_a.player_id
-            else len(units_a)
-        )
-
+        # 3. O dano ao jogador continua seguindo as regras de estágio.
+        # _calculate_damage usa dano base do estágio + sobreviventes.
         damage = self._calculate_damage(
             loser.env,
             winner_power,
@@ -920,49 +1073,31 @@ class TFTLobby:
         result = CombatResult(
             winner_id=winner.player_id,
             loser_id=loser.player_id,
-
             winner_units=winner_units,
             loser_units=loser_units,
-
             damage=damage,
-
             winner_power=winner_power,
             loser_power=loser_power,
-
             draw=False,
         )
 
-        # --------------------------------------------------------
-        # 🧠 APPLY RESULT
-        # --------------------------------------------------------
+        # 4. Atualiza vitórias, derrotas e estado local.
         winner.wins += 1
         loser.losses += 1
 
-        winner.env.apply_combat_result(
-            result,
-            won=True,
-        )
+        winner.env.apply_combat_result(result, won=True)
+        loser.env.apply_combat_result(result, won=False)
 
-        loser.env.apply_combat_result(
-            result,
-            won=False,
-        )
-
-        # 🪙 Vitória PvP = +1 gold
+        # 5. Recompensa de vitória.
         winner.env.economy_manager.add_gold(
             GameConfig.WIN_GOLD
         )
 
-        # --------------------------------------------------------
-        # ❤️ DAMAGE
-        # --------------------------------------------------------
-
+        # 6. Dano ao jogador perdedor.
         loser.last_damage_taken = damage
+        loser.env.apply_damage(damage)
 
-        loser.env.apply_damage(
-            damage
-        )
-
+        # 7. Guarda o último resultado.
         winner.last_combat_result = result
         loser.last_combat_result = result
 
