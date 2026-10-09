@@ -483,7 +483,7 @@ class PPOTrainer:
             # --------------------------------------------------------
             # SELF-PLAY / ROLLOUT
             # --------------------------------------------------------
-            
+
             valid_mask = rollout.valid[:rollout.ptr]
 
             valid_rewards = (

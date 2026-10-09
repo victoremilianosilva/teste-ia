@@ -1328,7 +1328,7 @@ class Trainer:
             # ========================================================
             # 📊 GENERAL LOGS
             # ========================================================
-
+            mean_reward = None
             valid_mask = rollout.valid[:rollout.ptr]
 
             if valid_mask.any():
@@ -1419,8 +1419,8 @@ class Trainer:
             # 🏆 PRINT
             # ========================================================
 
-            if update % 5 == 0:
-
+            if update % 5 == 0 and mean_reward is not None:
+                
                 print(
                     f"📊 UPDATE {update} | "
                     f"Reward: "
