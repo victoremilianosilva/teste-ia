@@ -1,0 +1,5 @@
+# Dependências Python do projeto TFT (PPO + PyTorch + TensorBoard)
+numpy
+torch
+tensorboard
+pybind11

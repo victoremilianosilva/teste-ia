@@ -542,10 +542,13 @@ class MiniTFTEnv:
                 ),
                 "conditioned_board_target": int(
                     action.get(
-                        "conditioned_board_target",
+                        "board_move_target",
                         action.get(
-                            "board_target",
-                            0,
+                            "conditioned_board_target",
+                            action.get(
+                                "board_target",
+                                0,
+                            ),
                         ),
                     )
                 ),

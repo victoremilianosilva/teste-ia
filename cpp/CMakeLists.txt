@@ -43,7 +43,7 @@ find_package(Python REQUIRED COMPONENTS
 # ==========================================
 
 set(pybind11_DIR
-    "C:/Users/cilio/Desktop/Ideia louca/TFT/.venv/Lib/site-packages/pybind11/share/cmake/pybind11"
+    "C:/Users/Victor/Desktop/dev/Projects/TFT/.venv/Lib/site-packages/pybind11/share/cmake/pybind11"
 )
 
 find_package(pybind11 CONFIG REQUIRED)
