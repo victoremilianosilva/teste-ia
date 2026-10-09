@@ -15,7 +15,7 @@ class GameConfig:
 
     BASE_DIR = Path(__file__).resolve().parent.parent
 
-    UNITS_PATH = BASE_DIR / "units.json"
+    UNITS_PATH = BASE_DIR / "units_gerado.json"
     TRAITS_PATH = BASE_DIR / "traits.json"
 
     # =========================================================

@@ -1,0 +1,1419 @@
+[
+  {
+    "name": "Gromp",
+    "apiName": "DA_Gromp18_AP",
+    "cost": 2,
+    "traits": [
+      "Riftbeast",
+      "Adaptor"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 550.0,
+      "attack_damage": 30.0,
+      "attack_speed": 0.699999988079071,
+      "armor": 30.0,
+      "magic_resist": 30.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Murkwolf",
+    "apiName": "DA_Murkwolf18",
+    "cost": 2,
+    "traits": [
+      "Riftbeast",
+      "Ravager"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 700.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.75,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Pebbles",
+    "apiName": "DA_18_Sentry",
+    "cost": 1,
+    "traits": [
+      "Riftbeast",
+      "Invoker"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 500.0,
+      "attack_damage": 35.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 25.0,
+      "magic_resist": 25.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Cinderling",
+    "apiName": "DA_Cinderling18",
+    "cost": 1,
+    "traits": [
+      "Riftbeast",
+      "Hunter"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 500.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.699999988079071,
+      "armor": 25.0,
+      "magic_resist": 25.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Scuttlecrab",
+    "apiName": "DA_Scuttlecrab18",
+    "cost": 2,
+    "traits": [
+      "Riftbeast",
+      "Juggernaut"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 950.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.6499999761581421,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Krug",
+    "apiName": "DA_Krug18",
+    "cost": 3,
+    "traits": [
+      "Riftbeast",
+      "Brawler"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1100.0,
+      "attack_damage": 55.0,
+      "attack_speed": 0.6000000238418579,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Sentinel",
+    "apiName": "DA_Sentinel18",
+    "cost": 4,
+    "traits": [
+      "Riftbeast",
+      "Vanguard",
+      "Invoker"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1300.0,
+      "attack_damage": 75.0,
+      "attack_speed": 0.6000000238418579,
+      "armor": 60.0,
+      "magic_resist": 60.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Brambleback",
+    "apiName": "DA_Brambleback18",
+    "cost": 4,
+    "traits": [
+      "Riftbeast",
+      "Ravager"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1100.0,
+      "attack_damage": 120.0,
+      "attack_speed": 0.550000011920929,
+      "armor": 65.0,
+      "magic_resist": 65.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Xayah",
+    "apiName": "DA_18_Xayah",
+    "cost": 1,
+    "traits": [
+      "Elderwood",
+      "Fae",
+      "Rapidfire"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 450.0,
+      "attack_damage": 45.0,
+      "attack_speed": 0.699999988079071,
+      "armor": 25.0,
+      "magic_resist": 25.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Ornn",
+    "apiName": "DA_18_Ornn",
+    "cost": 1,
+    "traits": [
+      "Elderwood",
+      "Defender"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 700.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.6000000238418579,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Nidalee",
+    "apiName": "DA_Nidalee18_AP",
+    "cost": 4,
+    "traits": [
+      "Primal",
+      "Adaptor"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 850.0,
+      "attack_damage": 35.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 30.0,
+      "magic_resist": 30.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Hecarim",
+    "apiName": "DA_18_Hecarim",
+    "cost": 3,
+    "traits": [
+      "Elderwood",
+      "Vanguard"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1100.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.6499999761581421,
+      "armor": 50.0,
+      "magic_resist": 50.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Ezreal",
+    "apiName": "DA_18_Ezreal",
+    "cost": 4,
+    "traits": [
+      "Elderwood",
+      "Executioner"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 850.0,
+      "attack_damage": 45.0,
+      "attack_speed": 0.75,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Azir",
+    "apiName": "DA_18_Azir",
+    "cost": 3,
+    "traits": [
+      "Blackthorn",
+      "Executioner",
+      "Summoner"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 650.0,
+      "attack_damage": 30.0,
+      "attack_speed": 0.75,
+      "armor": 35.0,
+      "magic_resist": 35.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Rek'Sai",
+    "apiName": "DA_18_RekSai",
+    "cost": 1,
+    "traits": [
+      "Blackthorn",
+      "Brawler"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 700.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.550000011920929,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Veigar",
+    "apiName": "DA_18_Veigar",
+    "cost": 1,
+    "traits": [
+      "Blackthorn",
+      "Sprykin",
+      "Spellweaver"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 500.0,
+      "attack_damage": 25.0,
+      "attack_speed": 0.699999988079071,
+      "armor": 25.0,
+      "magic_resist": 25.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Maokai",
+    "apiName": "DA_18_Maokai",
+    "cost": 5,
+    "traits": [
+      "Old Growth",
+      "Juggernaut"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1150.0,
+      "attack_damage": 80.0,
+      "attack_speed": 0.6499999761581421,
+      "armor": 60.0,
+      "magic_resist": 60.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Malphite",
+    "apiName": "DA_18_Malphite",
+    "cost": 4,
+    "traits": [
+      "Blackthorn",
+      "Monolith"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1300.0,
+      "attack_damage": 70.0,
+      "attack_speed": 0.550000011920929,
+      "armor": 70.0,
+      "magic_resist": 70.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Yorick",
+    "apiName": "DA_18_Yorick",
+    "cost": 1,
+    "traits": [
+      "Blossom",
+      "Juggernaut",
+      "Summoner"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 650.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.6000000238418579,
+      "armor": 35.0,
+      "magic_resist": 35.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Yunara",
+    "apiName": "DA_18_Yunara",
+    "cost": 2,
+    "traits": [
+      "Blossom",
+      "Executioner"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 550.0,
+      "attack_damage": 42.0,
+      "attack_speed": 0.75,
+      "armor": 30.0,
+      "magic_resist": 30.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Sett",
+    "apiName": "DA_18_Sett",
+    "cost": 4,
+    "traits": [
+      "Blossom",
+      "Brawler"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1200.0,
+      "attack_damage": 80.0,
+      "attack_speed": 0.6499999761581421,
+      "armor": 60.0,
+      "magic_resist": 60.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Ahri",
+    "apiName": "DA_18_Ahri",
+    "cost": 4,
+    "traits": [
+      "Blossom",
+      "Spellweaver"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 850.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Ashe",
+    "apiName": "DA_18_Ashe",
+    "cost": 5,
+    "traits": [
+      "Blossom",
+      "Hunter"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 75.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 6.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Elise",
+    "apiName": "DA_18_Elise",
+    "cost": 2,
+    "traits": [
+      "Coven",
+      "Vanguard"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 20.0,
+      "attack_speed": 0.6499999761581421,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Caitlyn",
+    "apiName": "DA_18_Caitlyn",
+    "cost": 2,
+    "traits": [
+      "Coven",
+      "Hunter"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 550.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.699999988079071,
+      "armor": 30.0,
+      "magic_resist": 30.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Cassiopeia",
+    "apiName": "DA_18_Cassiopeia",
+    "cost": 3,
+    "traits": [
+      "Coven",
+      "Spellweaver"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 650.0,
+      "attack_damage": 30.0,
+      "attack_speed": 0.75,
+      "armor": 35.0,
+      "magic_resist": 35.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Morgana",
+    "apiName": "DA_18_Morgana",
+    "cost": 4,
+    "traits": [
+      "Coven",
+      "Invoker"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1100.0,
+      "attack_damage": 45.0,
+      "attack_speed": 0.75,
+      "armor": 60.0,
+      "magic_resist": 60.0,
+      "attack_range": 2.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Rakan",
+    "apiName": "DA_18_Rakan",
+    "cost": 1,
+    "traits": [
+      "Fae",
+      "Juggernaut",
+      "Vanguard"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 700.0,
+      "attack_damage": 45.0,
+      "attack_speed": 0.6000000238418579,
+      "armor": 35.0,
+      "magic_resist": 35.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Lillia",
+    "apiName": "DA_18_Lillia",
+    "cost": 4,
+    "traits": [
+      "Fae",
+      "Defender"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1300.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.6499999761581421,
+      "armor": 60.0,
+      "magic_resist": 60.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Kobuko",
+    "apiName": "DA_18_Kobuko",
+    "cost": 1,
+    "traits": [
+      "Sprykin",
+      "Brawler"
+    ],
+    "role": "APTank",
+    "stats": {
+      "max_hp": 700.0,
+      "attack_damage": 55.0,
+      "attack_speed": 0.6499999761581421,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Teemo",
+    "apiName": "DA_18_Teemo",
+    "cost": 2,
+    "traits": [
+      "Sprykin",
+      "Invoker"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 550.0,
+      "attack_damage": 35.0,
+      "attack_speed": 0.75,
+      "armor": 30.0,
+      "magic_resist": 30.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Rammus",
+    "apiName": "DA_18_Rammus",
+    "cost": 3,
+    "traits": [
+      "Sprykin",
+      "Defender"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1100.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.6000000238418579,
+      "armor": 50.0,
+      "magic_resist": 50.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Gnar",
+    "apiName": "DA_18_GnarSmall",
+    "cost": 5,
+    "traits": [
+      "Elderwood",
+      "Sprykin",
+      "Brawler"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 100.0,
+      "attack_speed": 0.8999999761581421,
+      "armor": 55.0,
+      "magic_resist": 55.0,
+      "attack_range": 2.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Tristana",
+    "apiName": "DA_18_Tristana",
+    "cost": 3,
+    "traits": [
+      "Fae",
+      "Sprykin",
+      "Hunter"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 650.0,
+      "attack_damage": 55.0,
+      "attack_speed": 0.75,
+      "armor": 35.0,
+      "magic_resist": 35.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Sivir",
+    "apiName": "DA_18_Sivir",
+    "cost": 4,
+    "traits": [
+      "Primal",
+      "Hunter"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 850.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Vi",
+    "apiName": "DA_Vi18",
+    "cost": 3,
+    "traits": [
+      "Primal",
+      "Juggernaut"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1100.0,
+      "attack_damage": 45.0,
+      "attack_speed": 0.75,
+      "armor": 50.0,
+      "magic_resist": 50.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Akali",
+    "apiName": "DA_18_Akali_AD",
+    "cost": 1,
+    "traits": [
+      "Inferno",
+      "Adaptor",
+      "Ravager"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 650.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.75,
+      "armor": 35.0,
+      "magic_resist": 35.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Varus",
+    "apiName": "DA_18_Varus",
+    "cost": 1,
+    "traits": [
+      "Inferno",
+      "Rapidfire"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 500.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.699999988079071,
+      "armor": 25.0,
+      "magic_resist": 25.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Amumu",
+    "apiName": "DA_Amumu18",
+    "cost": 4,
+    "traits": [
+      "Inferno",
+      "Juggernaut"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1300.0,
+      "attack_damage": 70.0,
+      "attack_speed": 0.699999988079071,
+      "armor": 60.0,
+      "magic_resist": 60.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Kennen",
+    "apiName": "DA_18_Kennen",
+    "cost": 5,
+    "traits": [
+      "Inferno",
+      "Executioner"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1200.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.8500000238418579,
+      "armor": 60.0,
+      "magic_resist": 60.0,
+      "attack_range": 2.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Aphelios",
+    "apiName": "DA_18_Aphelios",
+    "cost": 4,
+    "traits": [
+      "Lunar",
+      "Rapidfire"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 850.0,
+      "attack_damage": 60.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Diana",
+    "apiName": "DA_18_Diana",
+    "cost": 3,
+    "traits": [
+      "Lunar",
+      "Ravager",
+      "Vanguard"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 850.0,
+      "attack_damage": 30.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 50.0,
+      "magic_resist": 50.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Alune",
+    "apiName": "DA_18_Alune",
+    "cost": 5,
+    "traits": [
+      "Attuned",
+      "Lunar",
+      "Spellweaver"
+    ],
+    "role": "APCaster",
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Leona",
+    "apiName": "DA_18_Leona",
+    "cost": 1,
+    "traits": [
+      "Solar",
+      "Defender"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 750.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.6499999761581421,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Kayle",
+    "apiName": "DA_18_Kayle",
+    "cost": 2,
+    "traits": [
+      "Solar",
+      "Rapidfire"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 550.0,
+      "attack_damage": null,
+      "attack_speed": 0.75,
+      "armor": 30.0,
+      "magic_resist": 30.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": [
+      "damage"
+    ]
+  },
+  {
+    "name": "Sejuani",
+    "apiName": "DA_18_Sejuani",
+    "cost": 2,
+    "traits": [
+      "Solar",
+      "Juggernaut"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.6000000238418579,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Kha'Zix",
+    "apiName": "DA_18_KhaZix",
+    "cost": 3,
+    "traits": [
+      "Rival"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 950.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.8500000238418579,
+      "armor": 55.0,
+      "magic_resist": 55.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Rengar",
+    "apiName": "DA_18_Rengar",
+    "cost": 3,
+    "traits": [
+      "Rival"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 60.0,
+      "attack_speed": 0.75,
+      "armor": 55.0,
+      "magic_resist": 55.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Kog'Maw",
+    "apiName": "DA_KogMaw18_AD",
+    "cost": 3,
+    "traits": [
+      "Caustic",
+      "Adaptor",
+      "Invoker"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 650.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 35.0,
+      "magic_resist": 35.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Zyra",
+    "apiName": "DA_18_Zyra",
+    "cost": 4,
+    "traits": [
+      "Thornmaiden",
+      "Summoner"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 850.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.75,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Fiddlesticks",
+    "apiName": "DA_Fiddlesticks18",
+    "cost": 3,
+    "traits": [
+      "Flora Fatalis",
+      "Defender",
+      "Spellweaver"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1000.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.6499999761581421,
+      "armor": 55.0,
+      "magic_resist": 55.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Soraka",
+    "apiName": "DA_18_Soraka",
+    "cost": 4,
+    "traits": [
+      "Flora Fatalis",
+      "Executioner"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 850.0,
+      "attack_damage": 30.0,
+      "attack_speed": 0.75,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Taric",
+    "apiName": "DA_Taric18",
+    "cost": 5,
+    "traits": [
+      "Emerald Aspect",
+      "Vanguard"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1300.0,
+      "attack_damage": 55.0,
+      "attack_speed": 0.75,
+      "armor": 65.0,
+      "magic_resist": 65.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Ivern",
+    "apiName": "DA_18_Ivern",
+    "cost": 5,
+    "traits": [
+      "Greenfather"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1000.0,
+      "attack_damage": 60.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 55.0,
+      "magic_resist": 55.0,
+      "attack_range": 3.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Lux",
+    "apiName": "DA_Lux18_Base",
+    "cost": 5,
+    "traits": [
+      "Avatar"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 6.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Alistar",
+    "apiName": "DA_18_Alistar",
+    "cost": 2,
+    "traits": [
+      "Elderwood",
+      "Brawler"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 950.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.6000000238418579,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Draven",
+    "apiName": "DA_Draven18",
+    "cost": 5,
+    "traits": [
+      "Bounty Seeker"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 48.0,
+      "attack_speed": 0.8500000238418579,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 6.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Elder Dragon",
+    "apiName": "DA_18_ElderDragon",
+    "cost": 5,
+    "traits": [
+      "Apex Predator",
+      "Riftbeast"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 1800.0,
+      "attack_damage": 125.0,
+      "attack_speed": 0.5,
+      "armor": 75.0,
+      "magic_resist": 75.0,
+      "attack_range": 2.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Karma",
+    "apiName": "DA_Karma18",
+    "cost": 1,
+    "traits": [
+      "Blossom",
+      "Spellweaver"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 500.0,
+      "attack_damage": 25.0,
+      "attack_speed": 0.699999988079071,
+      "armor": 25.0,
+      "magic_resist": 25.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "LeBlanc",
+    "apiName": "DA_18_LeBlanc",
+    "cost": 2,
+    "traits": [
+      "Elderwood",
+      "Spellweaver"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 550.0,
+      "attack_damage": 30.0,
+      "attack_speed": 0.699999988079071,
+      "armor": 30.0,
+      "magic_resist": 30.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Master Yi",
+    "apiName": "DA_18_MasterYi_AD",
+    "cost": 3,
+    "traits": [
+      "Blossom",
+      "Adaptor"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 850.0,
+      "attack_damage": 60.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 55.0,
+      "magic_resist": 55.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Shen",
+    "apiName": "DA_18_Shen",
+    "cost": 2,
+    "traits": [
+      "Inferno",
+      "Defender"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 50.0,
+      "attack_speed": 0.6499999761581421,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Warwick",
+    "apiName": "DA_18_Warwick",
+    "cost": 2,
+    "traits": [
+      "Blackthorn",
+      "Ravager"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 750.0,
+      "attack_damage": 45.0,
+      "attack_speed": 0.75,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Camille",
+    "apiName": "DA_18_Camille",
+    "cost": 1,
+    "traits": [
+      "Coven",
+      "Ravager"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 700.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.75,
+      "armor": 40.0,
+      "magic_resist": 40.0,
+      "attack_range": 1.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Lux (Blackthorn)",
+    "apiName": "DA_Lux18_Blackthorn",
+    "cost": 5,
+    "traits": [
+      "Blackthorn",
+      "Avatar"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 6.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Lux (Blossom)",
+    "apiName": "DA_Lux18_Blossom",
+    "cost": 5,
+    "traits": [
+      "Blossom",
+      "Avatar"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 6.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Lux (Coven)",
+    "apiName": "DA_18_Lux_Coven",
+    "cost": 5,
+    "traits": [
+      "Coven",
+      "Avatar"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 6.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Lux (Elderwood)",
+    "apiName": "DA_18_Lux_Elderwood",
+    "cost": 5,
+    "traits": [
+      "Elderwood",
+      "Avatar"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 6.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Lux (Fae)",
+    "apiName": "DA_18_Lux_Fae",
+    "cost": 5,
+    "traits": [
+      "Fae",
+      "Avatar"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 6.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Lux (Inferno)",
+    "apiName": "DA_18_Lux_Inferno",
+    "cost": 5,
+    "traits": [
+      "Inferno",
+      "Avatar"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 6.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Lux (Lunar)",
+    "apiName": "DA_18_Lux_Moonbeam",
+    "cost": 5,
+    "traits": [
+      "Lunar",
+      "Avatar"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 6.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Lux (Primal)",
+    "apiName": "DA_18_Lux_Primal",
+    "cost": 5,
+    "traits": [
+      "Primal",
+      "Avatar"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 6.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Lux (Solar)",
+    "apiName": "DA_18_Lux_Sunbeam",
+    "cost": 5,
+    "traits": [
+      "Solar",
+      "Avatar"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 900.0,
+      "attack_damage": 40.0,
+      "attack_speed": 0.800000011920929,
+      "armor": 45.0,
+      "magic_resist": 45.0,
+      "attack_range": 6.0
+    },
+    "missing_stats": []
+  },
+  {
+    "name": "Mama Beak",
+    "apiName": "DA_CrimsonRaptor18",
+    "cost": 3,
+    "traits": [
+      "Riftbeast",
+      "Summoner",
+      "Rapidfire"
+    ],
+    "role": null,
+    "stats": {
+      "max_hp": 650.0,
+      "attack_damage": 55.0,
+      "attack_speed": 0.75,
+      "armor": 35.0,
+      "magic_resist": 35.0,
+      "attack_range": 4.0
+    },
+    "missing_stats": []
+  }
+]
