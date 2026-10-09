@@ -150,22 +150,47 @@ class TFTPolicy(nn.Module):
         if move_bench_mask.any():
             # Bench source
             logits = self.bench_head(conditioned[move_bench_mask])
+
             if masks is not None:
-                logits = self._mask_logits(logits, masks["bench_source_mask"][move_bench_mask])
+                # Máscara específica para mover unidades do banco.
+                # bench_source_mask continua disponível para SELL.
+                source_mask = masks.get(
+                    "bench_move_source_mask",
+                    masks["bench_source_mask"]
+                )
+                logits = self._mask_logits(
+                    logits,
+                    source_mask[move_bench_mask]
+                )
+
             sampled = self._sample_categorical(logits, deterministic)
             bench_slot[move_bench_mask] = sampled
             dist = Categorical(logits=logits)
             total_logprob[move_bench_mask] += dist.log_prob(sampled)
             total_entropy[move_bench_mask] += dist.entropy()
 
-            # Board target
+            # Board target condicionado ao slot selecionado no banco
             logits = self.bench_to_board_head(conditioned[move_bench_mask])
+
             if masks is not None:
-                logits = self._mask_logits(logits, masks["board_target_mask"][move_bench_mask])
-            sampled = self._sample_categorical(logits, deterministic)
-            board_target[move_bench_mask] = sampled
+                batch_indices = torch.where(move_bench_mask)[0]
+
+                if "bench_to_board_target_masks" in masks:
+                    target_mask = masks["bench_to_board_target_masks"][
+                        batch_indices,
+                        sampled,
+                        :
+                    ]
+                else:
+                    # Compatibilidade com máscaras antigas.
+                    target_mask = masks["board_target_mask"][move_bench_mask]
+
+                logits = self._mask_logits(logits, target_mask)
+
+            sampled_target = self._sample_categorical(logits, deterministic)
+            board_target[move_bench_mask] = sampled_target
             dist = Categorical(logits=logits)
-            total_logprob[move_bench_mask] += dist.log_prob(sampled)
+            total_logprob[move_bench_mask] += dist.log_prob(sampled_target)
             total_entropy[move_bench_mask] += dist.entropy()
 
         # --- MOVE BOARD ---
@@ -174,23 +199,43 @@ class TFTPolicy(nn.Module):
             # Source
             logits = self.board_source_head(conditioned[move_board_mask])
             if masks is not None:
-                logits = self._mask_logits(logits, masks["board_source_mask"][move_board_mask])
+                logits = self._mask_logits(
+                    logits,
+                    masks["board_source_mask"][move_board_mask]
+                )
+
             sampled_source = self._sample_categorical(logits, deterministic)
             board_source[move_board_mask] = sampled_source
             src_dist = Categorical(logits=logits)
             total_logprob[move_board_mask] += src_dist.log_prob(sampled_source)
             total_entropy[move_board_mask] += src_dist.entropy()
 
-            # Target (conditional)
-            source_onehot = F.one_hot(sampled_source, num_classes=self.action_dims[4]).float()
-            target_input = torch.cat([conditioned[move_board_mask], source_onehot], dim=-1)
+            # Target condicionado à origem selecionada
+            source_onehot = F.one_hot(
+                sampled_source,
+                num_classes=self.action_dims[4]
+            ).float()
+
+            target_input = torch.cat(
+                [conditioned[move_board_mask], source_onehot],
+                dim=-1
+            )
             target_logits = self.board_move_target_head(target_input)
+
             if masks is not None:
                 full_move_masks = masks["board_move_target_masks"]
                 batch_indices = torch.where(move_board_mask)[0]
-                target_mask = full_move_masks[batch_indices, sampled_source, :]
+                target_mask = full_move_masks[
+                    batch_indices,
+                    sampled_source,
+                    :
+                ]
                 target_logits = self._mask_logits(target_logits, target_mask)
-            target_sampled = self._sample_categorical(target_logits, deterministic)
+
+            target_sampled = self._sample_categorical(
+                target_logits,
+                deterministic
+            )
             board_move_target[move_board_mask] = target_sampled
             target_dist = Categorical(logits=target_logits)
             total_logprob[move_board_mask] += target_dist.log_prob(target_sampled)
@@ -201,7 +246,12 @@ class TFTPolicy(nn.Module):
         if sell_mask.any():
             logits = self.bench_head(conditioned[sell_mask])
             if masks is not None:
-                logits = self._mask_logits(logits, masks["bench_source_mask"][sell_mask])
+                # Venda continua usando a máscara original do banco.
+                logits = self._mask_logits(
+                    logits,
+                    masks["bench_source_mask"][sell_mask]
+                )
+
             sampled = self._sample_categorical(logits, deterministic)
             bench_slot[sell_mask] = sampled
             dist = Categorical(logits=logits)
@@ -243,17 +293,44 @@ class TFTPolicy(nn.Module):
         # MOVE BENCH
         move_bench_mask = action_type == 3
         if move_bench_mask.any():
-            # Bench
+            # Bench source
             logits = self.bench_head(conditioned[move_bench_mask])
-            logits = self._mask_logits(logits, masks["bench_source_mask"][move_bench_mask])
+
+            source_mask = masks.get(
+                "bench_move_source_mask",
+                masks["bench_source_mask"]
+            )
+            logits = self._mask_logits(
+                logits,
+                source_mask[move_bench_mask]
+            )
+
             dist = Categorical(logits=logits)
-            total_logprob[move_bench_mask] += dist.log_prob(actions[move_bench_mask, 2])
+            selected_bench_slots = actions[move_bench_mask, 2]
+            total_logprob[move_bench_mask] += dist.log_prob(selected_bench_slots)
             total_entropy[move_bench_mask] += dist.entropy()
-            # Target
+
+            # Target condicionado ao slot selecionado no banco
             logits = self.bench_to_board_head(conditioned[move_bench_mask])
-            logits = self._mask_logits(logits, masks["board_target_mask"][move_bench_mask])
+
+            batch_indices = torch.where(move_bench_mask)[0]
+
+            if "bench_to_board_target_masks" in masks:
+                target_mask = masks["bench_to_board_target_masks"][
+                    batch_indices,
+                    selected_bench_slots,
+                    :
+                ]
+            else:
+                # Compatibilidade com máscaras antigas.
+                target_mask = masks["board_target_mask"][move_bench_mask]
+
+            logits = self._mask_logits(logits, target_mask)
+
             dist = Categorical(logits=logits)
-            total_logprob[move_bench_mask] += dist.log_prob(actions[move_bench_mask, 3])
+            total_logprob[move_bench_mask] += dist.log_prob(
+                actions[move_bench_mask, 3]
+            )
             total_entropy[move_bench_mask] += dist.entropy()
 
         # MOVE BOARD
@@ -261,32 +338,53 @@ class TFTPolicy(nn.Module):
         if move_board_mask.any():
             # Source
             logits = self.board_source_head(conditioned[move_board_mask])
-            logits = self._mask_logits(logits, masks["board_source_mask"][move_board_mask])
+            logits = self._mask_logits(
+                logits,
+                masks["board_source_mask"][move_board_mask]
+            )
             dist = Categorical(logits=logits)
-            total_logprob[move_board_mask] += dist.log_prob(actions[move_board_mask, 4])
+            total_logprob[move_board_mask] += dist.log_prob(
+                actions[move_board_mask, 4]
+            )
             total_entropy[move_board_mask] += dist.entropy()
 
-            # Target (conditional)
+            # Target condicionado à origem selecionada
             source_action = actions[move_board_mask, 4]
-            source_onehot = F.one_hot(source_action, num_classes=self.action_dims[4]).float()
-            target_input = torch.cat([conditioned[move_board_mask], source_onehot], dim=-1)
+            source_onehot = F.one_hot(
+                source_action,
+                num_classes=self.action_dims[4]
+            ).float()
+
+            target_input = torch.cat(
+                [conditioned[move_board_mask], source_onehot],
+                dim=-1
+            )
             target_logits = self.board_move_target_head(target_input)
 
-            # Vetorização da máscara condicional
+            # Máscara condicional por origem
             full_move_masks = masks["board_move_target_masks"]
             batch_indices = torch.where(move_board_mask)[0]
-            target_mask = full_move_masks[batch_indices, source_action, :]
+            target_mask = full_move_masks[
+                batch_indices,
+                source_action,
+                :
+            ]
             target_logits = self._mask_logits(target_logits, target_mask)
 
             target_dist = Categorical(logits=target_logits)
-            total_logprob[move_board_mask] += target_dist.log_prob(actions[move_board_mask, 5])
+            total_logprob[move_board_mask] += target_dist.log_prob(
+                actions[move_board_mask, 5]
+            )
             total_entropy[move_board_mask] += target_dist.entropy()
 
         # SELL
         sell_mask = action_type == 5
         if sell_mask.any():
             logits = self.bench_head(conditioned[sell_mask])
-            logits = self._mask_logits(logits, masks["bench_source_mask"][sell_mask])
+            logits = self._mask_logits(
+                logits,
+                masks["bench_source_mask"][sell_mask]
+            )
             dist = Categorical(logits=logits)
             total_logprob[sell_mask] += dist.log_prob(actions[sell_mask, 2])
             total_entropy[sell_mask] += dist.entropy()

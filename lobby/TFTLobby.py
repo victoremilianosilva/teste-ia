@@ -336,13 +336,28 @@ class TFTLobby:
                 for source in range(28)
             ])
 
+            bench_move_source_mask = np.asarray(
+                manager.get_bench_move_source_mask(),
+                dtype=np.bool_,
+            )
+
+            bench_to_board_target_masks = np.stack([
+                np.asarray(
+                    manager.get_bench_to_board_target_mask(slot),
+                    dtype=np.bool_,
+                )
+                for slot in range(9)
+            ])
+
             masks.append({
                 "type_mask": np.asarray(raw[0], dtype=np.bool_),
                 "shop_mask": np.asarray(raw[1], dtype=np.bool_),
                 "bench_source_mask": np.asarray(raw[2], dtype=np.bool_),
                 "board_target_mask": np.asarray(raw[3], dtype=np.bool_),
                 "board_source_mask": np.asarray(raw[4], dtype=np.bool_),
-                "board_move_target_masks": move_target_masks,
+                "board_move_target_masks": move_target_masks,           
+                "bench_move_source_mask": bench_move_source_mask,
+                "bench_to_board_target_masks": bench_to_board_target_masks,
             })
 
         return masks
@@ -375,6 +390,12 @@ class TFTLobby:
         move_target_masks = np.zeros((28, 28), dtype=np.bool_)
         move_target_masks[0, 0] = True
 
+        bench_move_source_mask = np.zeros(9, dtype=np.bool_)
+        bench_move_source_mask[0] = True
+
+        bench_to_board_target_masks = np.zeros((9, 28), dtype=np.bool_)
+        bench_to_board_target_masks[0, 0] = True
+
         return {
             "type_mask": type_mask,
             "shop_mask": shop_mask,
@@ -382,6 +403,8 @@ class TFTLobby:
             "board_target_mask": target_mask,
             "board_source_mask": source_mask,
             "board_move_target_masks": move_target_masks,
+            "bench_move_source_mask": bench_move_source_mask,
+            "bench_to_board_target_masks": bench_to_board_target_masks,
         }
 
 

@@ -49,7 +49,9 @@ class Trainer:
         "bench_source_mask": (9,),
         "board_target_mask": (28,),
         "board_source_mask": (28,),
-        "board_move_target_masks": (28, 28)
+        "board_move_target_masks": (28, 28),
+        "bench_move_source_mask": (9,),
+        "bench_to_board_target_masks": (9, 28),
     }
 
     def __init__(
@@ -1420,7 +1422,7 @@ class Trainer:
             # ========================================================
 
             if update % 5 == 0 and mean_reward is not None:
-                
+
                 print(
                     f"📊 UPDATE {update} | "
                     f"Reward: "
