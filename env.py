@@ -1080,11 +1080,8 @@ class MiniTFTEnv:
         self.last_combat_won = bool(won)
 
         if won:
-
-            self.economy_manager.register_win()
-
+            self.economy_manager.register_pvp_win()
         else:
-
             self.economy_manager.register_loss()
 
         self._rebuild_player_state()

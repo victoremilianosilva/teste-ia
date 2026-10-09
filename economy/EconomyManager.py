@@ -317,7 +317,7 @@ class EconomyManager:
             self.gold - old_gold
         )
 
-        return {
+        result = {
             "round": round_number,
 
             "old_gold": old_gold,
@@ -345,6 +345,10 @@ class EconomyManager:
             "xp": self.xp,
             "xp_to_next": self.get_xp_to_next(),
         }
+
+        self.round_win_gold = 0
+
+        return result
 
     # =============================================================
     # 📊 STATE

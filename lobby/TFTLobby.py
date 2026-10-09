@@ -988,7 +988,7 @@ class TFTLobby:
                 combat_input.player_b = cpp_team
 
         return combat_input
-  
+    
     def resolve_combat(self, player_a, player_b):
         # 1. Monta a entrada e executa o motor C++.
         combat_input = self._build_cpp_combat_input(
@@ -1014,13 +1014,12 @@ class TFTLobby:
         survivors_a = int(cpp_result.player_a_survivors)
         survivors_b = int(cpp_result.player_b_survivors)
 
-        # 2. Resolve o vencedor exclusivamente pelo resultado do C++.
+        # 2. Identifica vencedor e perdedor usando o resultado do C++.
         if cpp_result.winner == combat_engine.CombatWinner.PLAYER_A:
             winner = player_a
             loser = player_b
             winner_units = survivors_a
             loser_units = survivors_b
-
 
         elif cpp_result.winner == combat_engine.CombatWinner.PLAYER_B:
             winner = player_b
@@ -1029,7 +1028,7 @@ class TFTLobby:
             loser_units = survivors_a
 
         else:
-            # Empate real: ninguém recebe dano de jogador nem ouro de vitória.
+            # 3. Empate: ninguém recebe dano de jogador nem bônus de vitória.
             result = CombatResult(
                 winner_id=None,
                 loser_id=None,
@@ -1048,11 +1047,8 @@ class TFTLobby:
 
             return result
 
-        # 3. O dano ao jogador continua seguindo as regras de estágio.
-        # _calculate_damage usa dano base do estágio + sobreviventes.
-        damage = self._calculate_damage(
-            winner_units,
-        )
+        # 4. Calcula o dano ao jogador perdedor.
+        damage = self._calculate_damage(winner_units)
 
         result = CombatResult(
             winner_id=winner.player_id,
@@ -1063,23 +1059,20 @@ class TFTLobby:
             draw=False,
         )
 
-        # 4. Atualiza vitórias, derrotas e estado local.
+        # 5. Atualiza estatísticas e economia dos dois jogadores.
         winner.wins += 1
         loser.losses += 1
 
+        # O ambiente registra a sequência e o bônus de vitória.
+        # O perdedor também atualiza sua sequência de derrotas.
         winner.env.apply_combat_result(result, won=True)
         loser.env.apply_combat_result(result, won=False)
 
-        # 5. Recompensa de vitória.
-        winner.env.economy_manager.add_gold(
-            GameConfig.WIN_GOLD
-        )
-
-        # 6. Dano ao jogador perdedor.
+        # 6. Aplica o dano somente ao jogador perdedor.
         loser.last_damage_taken = damage
         loser.env.apply_damage(damage)
 
-        # 7. Guarda o último resultado.
+        # 7. Guarda o resultado do combate.
         winner.last_combat_result = result
         loser.last_combat_result = result
 
