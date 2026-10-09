@@ -33,7 +33,6 @@ from combat.CombatProfileManager import (
     UnitRole,
 )
 
-
 import sys
 from pathlib import Path
 
