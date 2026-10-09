@@ -71,9 +71,6 @@ class CombatResult:
 
     damage: int
 
-    winner_power: float
-    loser_power: float
-
     draw: bool = False
 
 
@@ -1014,11 +1011,6 @@ class TFTLobby:
                 "mas não concluiu a simulação."
             )
 
-        # Mantém esses valores apenas para compatibilidade com o
-        # CombatResult Python e para observabilidade durante a migração.
-        power_a = self._calculate_board_power(player_a.env)
-        power_b = self._calculate_board_power(player_b.env)
-
         survivors_a = int(cpp_result.player_a_survivors)
         survivors_b = int(cpp_result.player_b_survivors)
 
@@ -1028,16 +1020,13 @@ class TFTLobby:
             loser = player_b
             winner_units = survivors_a
             loser_units = survivors_b
-            winner_power = power_a
-            loser_power = power_b
+
 
         elif cpp_result.winner == combat_engine.CombatWinner.PLAYER_B:
             winner = player_b
             loser = player_a
             winner_units = survivors_b
             loser_units = survivors_a
-            winner_power = power_b
-            loser_power = power_a
 
         else:
             # Empate real: ninguém recebe dano de jogador nem ouro de vitória.
@@ -1065,8 +1054,6 @@ class TFTLobby:
         # _calculate_damage usa dano base do estágio + sobreviventes.
         damage = self._calculate_damage(
             loser.env,
-            winner_power,
-            loser_power,
             winner_units,
         )
 
@@ -1076,8 +1063,6 @@ class TFTLobby:
             winner_units=winner_units,
             loser_units=loser_units,
             damage=damage,
-            winner_power=winner_power,
-            loser_power=loser_power,
             draw=False,
         )
 
@@ -1263,48 +1248,13 @@ class TFTLobby:
     # ============================================================
     # ❤️ DAMAGE
     # ============================================================
-    def _calculate_damage(
-        self,
-        loser_env,
-        winner_power,
-        loser_power,
-        winner_units,
-    ):
-        """
-        💥 Calcula o dano de jogador.
+    def _calculate_damage(self, winner_units: int) -> int:
+        """Dano ao jogador: dano base do estágio + sobreviventes."""
 
-        TFT:
+        base_damage = GameConfig.get_stage_damage(self.stage)
+        survivors = max(0, int(winner_units))
 
-            dano = dano_base_do_estágio
-                + unidades_inimigas_sobreviventes
-
-        winner_power / loser_power são mantidos na assinatura
-        somente por compatibilidade com o restante do lobby.
-
-        Eles NÃO participam do dano.
-        """
-
-        del winner_power
-        del loser_power
-
-        base_damage = GameConfig.get_stage_damage(
-            self.stage
-        )
-
-        survivors = max(
-            0,
-            int(winner_units),
-        )
-
-        damage = (
-            base_damage
-            + survivors
-        )
-
-        return max(
-            0,
-            int(damage),
-        )
+        return max(0, base_damage + survivors)
 
     # ============================================================
     # ☠️ ELIMINATION
