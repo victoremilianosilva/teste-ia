@@ -7,10 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from lobby.TFTLobby import TFTLobby
 
-from stable_baselines3.common.vec_env import (
-    SubprocVecEnv,
-    DummyVecEnv
-)
+from vector_lobby_env import LobbyVectorEnv
 
 from policy import TFTPolicy
 from rollout import RolloutBuffer
@@ -156,22 +153,25 @@ class Trainer:
         # ============================================================
 
         if use_subprocess:
-
-            self.vec_env = SubprocVecEnv(
-                [
-                    make_env
-                    for _ in range(num_envs)
-                ]
+            # Uma instância de TFTLobby por ambiente vetorizado.
+            # Cada TFTLobby contém 8 jogadores.
+            self.vec_env = LobbyVectorEnv(
+                [lambda: TFTLobby() for _ in range(self.num_envs)]
             )
 
-        else:
+            dummy_obs = self.vec_env.reset()
 
-            self.vec_env = DummyVecEnv(
-                [
-                    make_env
-                    for _ in range(num_envs)
-                ]
-            )
+            if dummy_obs.ndim != 3:
+                raise ValueError(
+                    "Esperava observações no formato "
+                    "(num_lobbies, 8, obs_dim), "
+                    f"recebi {dummy_obs.shape}"
+                )
+
+            self.obs_dim = dummy_obs.shape[-1]
+
+            print(f"📐 Observation dim: {self.obs_dim}")
+            print(f"📐 Vec observation shape: {dummy_obs.shape}")
 
         # ============================================================
         # 👀 INITIAL OBSERVATION
@@ -888,6 +888,12 @@ class Trainer:
             dtype=np.float32
         )
 
+        # Evita registrar várias vezes o mesmo episódio individual.
+        episode_active = np.ones(
+            self.num_agents,
+            dtype=np.bool_,
+        )
+
         episode_history = []
 
         print(
@@ -1114,35 +1120,34 @@ class Trainer:
                     rewards_np
                 )
 
-                # ====================================================
-                # 📊 EPISODE LOG
-                # ====================================================
+                
+                # ============================================================
+                # 📊 EPISODE LOG — UM REGISTRO POR EPISÓDIO
+                # ============================================================
 
-                for agent_idx, done in enumerate(
-                    player_dones_np
-                ):
-
-                    if done:
-
-                        ret = (
-                            episode_returns[
-                                agent_idx
-                            ]
-                        )
+                for agent_idx, done in enumerate(player_dones_np):
+                    if done and episode_active[agent_idx]:
+                        ret = float(episode_returns[agent_idx])
 
                         self.writer.add_scalar(
                             "charts/episode_return",
                             ret,
-                            len(episode_history)
+                            len(episode_history),
                         )
 
-                        episode_history.append(
-                            ret
-                        )
+                        episode_history.append(ret)
+                        episode_returns[agent_idx] = 0.0
+                        episode_active[agent_idx] = False
 
-                        episode_returns[
-                            agent_idx
-                        ] = 0.0
+                # Quando a lobby termina, todos os oito jogadores iniciam
+                # um novo episódio na próxima partida.
+                for lobby_idx, info in enumerate(infos):
+                    if info.get("lobby_done", False):
+                        start_idx = lobby_idx * self.PLAYERS_PER_LOBBY
+                        end_idx = start_idx + self.PLAYERS_PER_LOBBY
+
+                        episode_active[start_idx:end_idx] = True
+                        episode_returns[start_idx:end_idx] = 0.0
 
             # ========================================================
             # 🧮 BOOTSTRAP VALUE

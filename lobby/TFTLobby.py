@@ -95,7 +95,7 @@ class LobbyPlayer:
 
     last_combat_result: CombatResult | None = None
     last_damage_taken: int = 0
-
+    placement_reward_given: bool = False
 
 # ============================================================
 # 🌐 TFT LOBBY
@@ -250,7 +250,8 @@ class TFTLobby:
 
             player.last_combat_result = None
             player.last_damage_taken = 0
-
+            player.placement_reward_given = False
+        
         # --------------------------------------------------------
         # 🌍 GLOBAL
         # --------------------------------------------------------
@@ -314,30 +315,35 @@ class TFTLobby:
     # ============================================================
 
     def get_action_masks(self):
-
+        """Retorna máscaras nomeadas para os oito jogadores."""
         masks = []
 
         for player in self.players:
-
-            # ----------------------------------------------------
-            # ☠️ DEAD PLAYER
-            # ----------------------------------------------------
-
             if not player.alive:
-
-                masks.append(
-                    self._dead_player_mask()
-                )
-
+                masks.append(self._dead_player_mask())
                 continue
 
-            # ----------------------------------------------------
-            # 🧠 ENV MASK
-            # ----------------------------------------------------
+            raw = player.env.get_action_masks()
+            manager = player.env.action_mask_manager
 
-            masks.append(
-                player.env.get_action_masks()
-            )
+            # Cada linha representa uma origem do tabuleiro.
+            # Cada coluna representa um destino válido para essa origem.
+            move_target_masks = np.stack([
+                np.asarray(
+                    manager.get_board_move_target_mask(source),
+                    dtype=np.bool_,
+                )
+                for source in range(28)
+            ])
+
+            masks.append({
+                "type_mask": np.asarray(raw[0], dtype=np.bool_),
+                "shop_mask": np.asarray(raw[1], dtype=np.bool_),
+                "bench_source_mask": np.asarray(raw[2], dtype=np.bool_),
+                "board_target_mask": np.asarray(raw[3], dtype=np.bool_),
+                "board_source_mask": np.asarray(raw[4], dtype=np.bool_),
+                "board_move_target_masks": move_target_masks,
+            })
 
         return masks
 
@@ -347,34 +353,45 @@ class TFTLobby:
 
     @staticmethod
     def _dead_player_mask():
+        """
+        Um jogador eliminado só pode executar PASS.
+        As outras cabeças recebem uma categoria dummy válida.
+        """
+        type_mask = np.zeros(7, dtype=np.bool_)
+        type_mask[6] = True  # ActionType.PASS
 
+        shop_mask = np.zeros(5, dtype=np.bool_)
+        shop_mask[0] = True
+
+        bench_mask = np.zeros(9, dtype=np.bool_)
+        bench_mask[0] = True
+
+        target_mask = np.zeros(28, dtype=np.bool_)
+        target_mask[0] = True
+
+        source_mask = np.zeros(28, dtype=np.bool_)
+        source_mask[0] = True
+
+        move_target_masks = np.zeros((28, 28), dtype=np.bool_)
+        move_target_masks[0, 0] = True
+
+        return {
+            "type_mask": type_mask,
+            "shop_mask": shop_mask,
+            "bench_source_mask": bench_mask,
+            "board_target_mask": target_mask,
+            "board_source_mask": source_mask,
+            "board_move_target_masks": move_target_masks,
+        }
+
+
+    def get_strategies(self):
+        """Permite ao Trainer contabilizar a estratégia de cada jogador."""
         return [
-            np.array(
-                [0, 0, 0, 0, 0, 0, 1],
-                dtype=np.int8,
-            ),
-            np.zeros(
-                5,
-                dtype=np.int8,
-            ),
-            np.zeros(
-                9,
-                dtype=np.int8,
-            ),
-            np.zeros(
-                28,
-                dtype=np.int8,
-            ),
-            np.zeros(
-                28,
-                dtype=np.int8,
-            ),
-            np.zeros(
-                28,
-                dtype=np.int8,
-            ),
+            player.env.get_strategy()
+            for player in self.players
         ]
-
+   
     # ============================================================
     # 🎮 STEP
     # ============================================================
@@ -485,6 +502,15 @@ class TFTLobby:
 
         self.eliminate_players()
 
+        # 🏆 FINISH
+        if self._check_finished():
+            self.finished = True
+            self._finalize_ranking()
+
+        # 🏆 RECOMPENSA FINAL DE COLOCAÇÃO
+        # Aplicada somente depois que as colocações forem definidas.
+        placement_rewards = self._apply_placement_rewards(rewards)
+
         # --------------------------------------------------------
         # 🏆 FINISH
         # --------------------------------------------------------
@@ -505,6 +531,7 @@ class TFTLobby:
             "stage": self.stage,
             "finished": self.finished,
             "round_info": round_info,
+            "placement_rewards": placement_rewards,
         }
 
         return (
@@ -1702,6 +1729,52 @@ class TFTLobby:
                 for player in self.players
             ],
         }
+
+    def _calculate_placement_reward(self, placement):
+        """
+        Converte a colocação final em uma recompensa entre -1 e +1.
+
+        1º lugar -> +1.0
+        8º lugar -> -1.0
+        Os lugares intermediários são distribuídos linearmente.
+        """
+        placement = int(placement)
+
+        if not 1 <= placement <= self.PLAYERS_PER_LOBBY:
+            raise ValueError(f"Colocação inválida: {placement}")
+
+        return 1.0 - 2.0 * (
+            (placement - 1) / (self.PLAYERS_PER_LOBBY - 1)
+        )
+
+
+    def _apply_placement_rewards(self, rewards):
+        """
+        Entrega a recompensa uma única vez, assim que a colocação
+        do jogador é conhecida.
+
+        Isso inclui jogadores eliminados antes do fim da partida
+        e os sobreviventes quando a lobby termina.
+        """
+        placement_rewards = {}
+
+        for player in self.players:
+            if player.placement is None:
+                continue
+
+            if player.placement_reward_given:
+                continue
+
+            reward = self._calculate_placement_reward(
+                player.placement
+            )
+
+            rewards[player.player_id] += reward
+            player.placement_reward_given = True
+
+            placement_rewards[player.player_id] = reward
+
+        return placement_rewards
 
     # ============================================================
     # 🐛 DEBUG
