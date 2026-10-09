@@ -204,6 +204,12 @@ class RolloutBuffer:
             device=self.device
         )
 
+        self.valid = torch.zeros(
+            (self.num_steps, self.num_envs),
+            dtype=torch.bool,
+            device=self.device,
+        )
+
         # ============================================================
         # ACTION MASKS
         # ============================================================
@@ -236,7 +242,8 @@ class RolloutBuffer:
         rewards,
         dones,
         values,
-        masks_dict
+        masks_dict,
+        valid=None,
     ):
         """
         Adiciona uma transição de todos os agentes.
@@ -259,6 +266,25 @@ class RolloutBuffer:
 
             num_agents = num_lobbies * 8
         """
+
+        if valid is None:
+            valid = torch.ones(
+                self.num_envs,
+                dtype=torch.bool,
+                device=self.device,
+            )
+        else:
+            valid = self._to_tensor(
+                valid,
+                dtype=torch.bool,
+            )
+
+        if tuple(valid.shape) != (self.num_envs,):
+            raise ValueError(
+                f"Shape inválido para valid: {tuple(valid.shape)}"
+            )
+
+        self.valid[self.ptr].copy_(valid)
 
         if self.ptr >= self.num_steps:
             raise RuntimeError(
@@ -695,6 +721,21 @@ class RolloutBuffer:
             steps * self.num_envs
         )
 
+        valid_indices = torch.nonzero(
+            self.valid[:steps].reshape(-1),
+            as_tuple=False,
+        ).squeeze(-1)
+
+        if valid_indices.numel() == 0:
+            return
+
+        indices = valid_indices[
+            torch.randperm(
+                valid_indices.numel(),
+                device=self.device,
+            )
+        ]
+        
         # ============================================================
         # ADVANTAGE
         # ============================================================

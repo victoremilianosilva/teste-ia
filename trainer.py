@@ -152,26 +152,25 @@ class Trainer:
         # 🚀 VECTOR ENV
         # ============================================================
 
-        if use_subprocess:
-            # Uma instância de TFTLobby por ambiente vetorizado.
-            # Cada TFTLobby contém 8 jogadores.
-            self.vec_env = LobbyVectorEnv(
-                [lambda: TFTLobby() for _ in range(self.num_envs)]
+        # LobbyVectorEnv é serial: uma instância por lobby.
+        # Inicializamos independentemente de use_subprocess.
+        self.vec_env = LobbyVectorEnv(
+            [make_env for _ in range(self.num_envs)]
+        )
+
+        dummy_obs = self.vec_env.reset()
+
+        if dummy_obs.ndim != 3:
+            raise ValueError(
+                "Esperava observações no formato "
+                "(num_lobbies, 8, obs_dim), "
+                f"recebi {dummy_obs.shape}"
             )
 
-            dummy_obs = self.vec_env.reset()
+        self.obs_dim = dummy_obs.shape[-1]
 
-            if dummy_obs.ndim != 3:
-                raise ValueError(
-                    "Esperava observações no formato "
-                    "(num_lobbies, 8, obs_dim), "
-                    f"recebi {dummy_obs.shape}"
-                )
-
-            self.obs_dim = dummy_obs.shape[-1]
-
-            print(f"📐 Observation dim: {self.obs_dim}")
-            print(f"📐 Vec observation shape: {dummy_obs.shape}")
+        print(f"📐 Observation dim: {self.obs_dim}")
+        print(f"📐 Vec observation shape: {dummy_obs.shape}")
 
         # ============================================================
         # 👀 INITIAL OBSERVATION
@@ -894,6 +893,13 @@ class Trainer:
             dtype=np.bool_,
         )
 
+        # ☠️ Controle de jogadores que ainda podem gerar experiências.
+        # Começam todos ativos no início das partidas.
+        active_agents = np.ones(
+            self.num_agents,
+            dtype=np.bool_,
+        )
+
         episode_history = []
 
         print(
@@ -975,6 +981,11 @@ class Trainer:
                 strategy_counts += (
                     current_strategy_counts
                 )
+
+
+                # 📸 Fotografa quem pode gerar experiência neste passo.
+                # A cópia precisa acontecer ANTES da ação.
+                transition_valid = active_agents.copy()
 
                 # ====================================================
                 # 🤖 POLICY
@@ -1088,6 +1099,24 @@ class Trainer:
                     )
                 )
 
+                # ☠️ Atualiza a atividade depois da ação.
+                # A transição deste passo já foi marcada em transition_valid.
+
+                for lobby_idx, info in enumerate(infos):
+                    start_idx = lobby_idx * self.PLAYERS_PER_LOBBY
+                    end_idx = start_idx + self.PLAYERS_PER_LOBBY
+
+                    if info.get("lobby_done", False):
+                        # A partida terminou e a lobby foi reiniciada.
+                        # Os oito jogadores podem gerar novas experiências.
+                        active_agents[start_idx:end_idx] = True
+                    else:
+                        # Jogadores eliminados não geram experiências
+                        # nos próximos passos da mesma partida.
+                        active_agents[start_idx:end_idx] &= (
+                            ~player_dones_np[start_idx:end_idx].astype(np.bool_)
+                        )
+
                 next_dones = torch.as_tensor(
                     player_dones_np,
                     dtype=torch.float32,
@@ -1105,7 +1134,8 @@ class Trainer:
                     rewards,
                     next_dones,
                     values,
-                    masks
+                    masks,
+                    valid=transition_valid,
                 )
 
                 # ====================================================
