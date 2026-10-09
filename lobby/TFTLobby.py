@@ -58,7 +58,6 @@ except ImportError as exc:
 # ============================================================
 # ⚔️ COMBAT RESULT
 # ============================================================
-
 @dataclass
 class CombatResult:
 
@@ -76,7 +75,6 @@ class CombatResult:
 # ============================================================
 # 👤 LOBBY PLAYER
 # ============================================================
-
 @dataclass
 class LobbyPlayer:
 
@@ -100,7 +98,6 @@ class LobbyPlayer:
 # ============================================================
 # 🌐 TFT LOBBY
 # ============================================================
-
 class TFTLobby:
 
     PLAYERS_PER_LOBBY = 8
@@ -222,7 +219,6 @@ class TFTLobby:
     # ============================================================
     # 🔄 RESET
     # ============================================================
-
     def reset(self):
 
         # --------------------------------------------------------
@@ -284,7 +280,6 @@ class TFTLobby:
     # ============================================================
     # 📊 OBSERVATIONS
     # ============================================================
-
     def get_observations(self):
 
         observations = []
@@ -313,7 +308,6 @@ class TFTLobby:
     # ============================================================
     # 🎯 ACTION MASKS
     # ============================================================
-
     def get_action_masks(self):
         """Retorna máscaras nomeadas para os oito jogadores."""
         masks = []
@@ -365,7 +359,6 @@ class TFTLobby:
     # ============================================================
     # ☠️ DEAD MASK
     # ============================================================
-
     @staticmethod
     def _dead_player_mask():
         """
@@ -407,7 +400,6 @@ class TFTLobby:
             "bench_to_board_target_masks": bench_to_board_target_masks,
         }
 
-
     def get_strategies(self):
         """Permite ao Trainer contabilizar a estratégia de cada jogador."""
         return [
@@ -418,7 +410,6 @@ class TFTLobby:
     # ============================================================
     # 🎮 STEP
     # ============================================================
-
     def step(self, actions):
 
         if self.finished:
@@ -499,25 +490,40 @@ class TFTLobby:
         # 🏁 CHECK ALL ALIVE PLAYERS
         # --------------------------------------------------------
 
+        combat_rewards = {}
+
         if self._all_alive_players_finished_round():
 
-            round_info = (
-                self._resolve_round()
+            round_info = self._resolve_round()
+
+            # 🎁 O combate já foi resolvido.
+            # Soma sua recompensa à transição atual do PPO.
+            combat_rewards = self._calculate_combat_rewards(
+                round_info.get("combat", [])
             )
 
-            for info in infos:
+            for player_id, combat_reward in combat_rewards.items():
+                rewards[player_id] += float(combat_reward)
 
-                info["round_resolved"] = True
-                info["round"] = self.round
-                info["matchups"] = (
-                    self.matchups
+            for info_item in infos:
+                info_item["combat_reward"] = float(
+                    combat_rewards.get(
+                        info_item.get("player_id"),
+                        0.0,
+                    )
                 )
+
+            for info_item in infos:
+                info_item["round_resolved"] = True
+                info_item["round"] = self.round
+                info_item["matchups"] = self.matchups
 
         else:
 
             round_info = {
                 "round_resolved": False,
             }
+
 
         # --------------------------------------------------------
         # ☠️ ELIMINATION
@@ -567,7 +573,6 @@ class TFTLobby:
     # ============================================================
     # 🧹 NORMALIZE ACTIONS
     # ============================================================
-
     def _normalize_actions(self, actions):
 
         normalized = {}
@@ -644,7 +649,6 @@ class TFTLobby:
     # ============================================================
     # ⏱️ ACTION LIMIT
     # ============================================================
-
     def _check_round_action_limit(self):
 
         limit = getattr(
@@ -671,7 +675,6 @@ class TFTLobby:
     # ============================================================
     # 🏁 ALL PLAYERS FINISHED
     # ============================================================
-
     def _all_alive_players_finished_round(self):
 
         alive_players = [
@@ -693,7 +696,6 @@ class TFTLobby:
     # ============================================================
     # 🔄 RESOLVE ROUND
     # ============================================================
-
     def _resolve_round(self):
 
         # --------------------------------------------------------
@@ -807,7 +809,6 @@ class TFTLobby:
     # ============================================================
     # ⚔️ MATCHMAKING
     # ============================================================
-
     def generate_matchups(self):
 
         alive_players = [
@@ -1063,66 +1064,158 @@ class TFTLobby:
                 combat_input.player_b = cpp_team
 
         return combat_input
-    
+
     def resolve_combat(self, player_a, player_b):
-        # 1. Monta a entrada e executa o motor C++.
-        combat_input = self._build_cpp_combat_input(
-            player_a,
-            player_b,
+        """
+        Resolve o combate entre dois jogadores.
+
+        Regras:
+        - Duas equipes com unidades: executa o motor C++.
+        - Apenas uma equipe com unidades: vitória automática.
+        - Duas equipes vazias: empate sem dano ou recompensa de vitória.
+        """
+
+        # --------------------------------------------------------
+        # 🔎 VERIFICA SE É POSSÍVEL INSPECIONAR OS TABULEIROS
+        # --------------------------------------------------------
+
+        board_manager_a = getattr(
+            player_a.env,
+            "board_manager",
+            None,
+        )
+        board_manager_b = getattr(
+            player_b.env,
+            "board_manager",
+            None,
         )
 
-        cpp_result = combat_engine.simulate(combat_input)
+        # Compatibilidade com testes antigos que simulam o motor C++
+        # e utilizam ambientes falsos sem board_manager.
+        can_check_empty_teams = (
+            board_manager_a is not None
+            and board_manager_b is not None
+        )
 
-        if not cpp_result.success:
-            raise RuntimeError(
-                f"Falha no motor C++: "
-                f"{cpp_result.error_code}: "
-                f"{cpp_result.error_message}"
+        # Estes valores serão preenchidos pelo combate normal
+        # ou pela resolução automática de equipes vazias.
+        winner = None
+        loser = None
+        winner_units = 0
+        loser_units = 0
+
+        # --------------------------------------------------------
+        # 🛡️ TRATAMENTO DE EQUIPES VAZIAS
+        # --------------------------------------------------------
+
+        if can_check_empty_teams:
+            units_a = self._get_alive_units(player_a.env)
+            units_b = self._get_alive_units(player_b.env)
+
+            # 🤝 Ambas as equipes estão vazias: empate.
+            if not units_a and not units_b:
+                result = CombatResult(
+                    winner_id=None,
+                    loser_id=None,
+                    winner_units=0,
+                    loser_units=0,
+                    damage=0,
+                    draw=True,
+                )
+
+                for player in (player_a, player_b):
+                    player.last_combat_result = result
+                    player.last_damage_taken = 0
+                    player.env.last_combat_result = result
+                    player.env.last_combat_won = False
+                    player.env._rebuild_player_state()
+
+                return result
+
+            # 🏆 A equipe A está vazia: vitória automática de B.
+            if not units_a:
+                winner = player_b
+                loser = player_a
+                winner_units = len(units_b)
+                loser_units = 0
+
+            # 🏆 A equipe B está vazia: vitória automática de A.
+            elif not units_b:
+                winner = player_a
+                loser = player_b
+                winner_units = len(units_a)
+                loser_units = 0
+
+        # --------------------------------------------------------
+        # ⚔️ COMBATE NORMAL NO MOTOR C++
+        # --------------------------------------------------------
+
+        if winner is None:
+            combat_input = self._build_cpp_combat_input(
+                player_a,
+                player_b,
             )
 
-        if not cpp_result.completed:
-            raise RuntimeError(
-                "O motor C++ aceitou a entrada, "
-                "mas não concluiu a simulação."
-            )
+            cpp_result = combat_engine.simulate(combat_input)
 
-        survivors_a = int(cpp_result.player_a_survivors)
-        survivors_b = int(cpp_result.player_b_survivors)
+            if not cpp_result.success:
+                raise RuntimeError(
+                    f"Falha no motor C++: "
+                    f"{cpp_result.error_code}: "
+                    f"{cpp_result.error_message}"
+                )
 
-        # 2. Identifica vencedor e perdedor usando o resultado do C++.
-        if cpp_result.winner == combat_engine.CombatWinner.PLAYER_A:
-            winner = player_a
-            loser = player_b
-            winner_units = survivors_a
-            loser_units = survivors_b
+            if not cpp_result.completed:
+                raise RuntimeError(
+                    "O motor C++ aceitou a entrada, "
+                    "mas não concluiu a simulação."
+                )
 
-        elif cpp_result.winner == combat_engine.CombatWinner.PLAYER_B:
-            winner = player_b
-            loser = player_a
-            winner_units = survivors_b
-            loser_units = survivors_a
+            survivors_a = int(cpp_result.player_a_survivors)
+            survivors_b = int(cpp_result.player_b_survivors)
 
-        else:
-            # 3. Empate: ninguém recebe dano de jogador nem bônus de vitória.
-            result = CombatResult(
-                winner_id=None,
-                loser_id=None,
-                winner_units=survivors_a,
-                loser_units=survivors_b,
-                damage=0,
-                draw=True,
-            )
+            if (
+                cpp_result.winner
+                == combat_engine.CombatWinner.PLAYER_A
+            ):
+                winner = player_a
+                loser = player_b
+                winner_units = survivors_a
+                loser_units = survivors_b
 
-            for player in (player_a, player_b):
-                player.last_combat_result = result
-                player.last_damage_taken = 0
-                player.env.last_combat_result = result
-                player.env.last_combat_won = False
-                player.env._rebuild_player_state()
+            elif (
+                cpp_result.winner
+                == combat_engine.CombatWinner.PLAYER_B
+            ):
+                winner = player_b
+                loser = player_a
+                winner_units = survivors_b
+                loser_units = survivors_a
 
-            return result
+            else:
+                # 🤝 Empate retornado pelo próprio motor C++.
+                result = CombatResult(
+                    winner_id=None,
+                    loser_id=None,
+                    winner_units=survivors_a,
+                    loser_units=survivors_b,
+                    damage=0,
+                    draw=True,
+                )
 
-        # 4. Calcula o dano ao jogador perdedor.
+                for player in (player_a, player_b):
+                    player.last_combat_result = result
+                    player.last_damage_taken = 0
+                    player.env.last_combat_result = result
+                    player.env.last_combat_won = False
+                    player.env._rebuild_player_state()
+
+                return result
+
+        # --------------------------------------------------------
+        # 💥 RESULTADO DE VITÓRIA OU DERROTA
+        # --------------------------------------------------------
+
         damage = self._calculate_damage(winner_units)
 
         result = CombatResult(
@@ -1134,162 +1227,102 @@ class TFTLobby:
             draw=False,
         )
 
-        # 5. Atualiza estatísticas e economia dos dois jogadores.
+        # 📊 Atualiza estatísticas da lobby.
         winner.wins += 1
         loser.losses += 1
 
-        # O ambiente registra a sequência e o bônus de vitória.
-        # O perdedor também atualiza sua sequência de derrotas.
-        winner.env.apply_combat_result(result, won=True)
-        loser.env.apply_combat_result(result, won=False)
+        # 💰 Atualiza economia, recompensa e sequências.
+        winner.env.apply_combat_result(
+            result,
+            won=True,
+        )
+        loser.env.apply_combat_result(
+            result,
+            won=False,
+        )
 
-        # 6. Aplica o dano somente ao jogador perdedor.
+        # ❤️ Aplica dano somente ao perdedor.
         loser.last_damage_taken = damage
         loser.env.apply_damage(damage)
 
-        # 7. Guarda o resultado do combate.
+        # 📝 Guarda o resultado para os dois jogadores.
         winner.last_combat_result = result
         loser.last_combat_result = result
 
         return result
 
     # ============================================================
-    # 💪 BOARD POWER
+    # 🎁 COMBAT REWARDS
     # ============================================================
+    def _calculate_combat_rewards(self, combat_results):
+        """
+        Calcula uma recompensa de combate para cada participante.
 
-    def _calculate_board_power(self, env):
+        A recompensa é calculada uma única vez por resultado.
+        Empates não geram recompensa de vitória ou derrota.
+        """
+        rewards = {}
 
-        units = self._get_alive_units(env)
-
-        if not units:
-            return 0.0
-
-        total = 0.0
-
-        for unit in units:
-
-            total += (
-                self._calculate_unit_power(
-                    unit
-                )
-            )
-
-        # --------------------------------------------------------
-        # ⭐ POSITIONING
-        # --------------------------------------------------------
-
-        try:
-
-            positioning = float(
-                env.positioning_manager
-                .evaluate_board(
-                    env.board_manager.board
-                )
-            )
-
-        except Exception:
-
-            positioning = 0.0
-
-        # --------------------------------------------------------
-        # 🧬 SYNERGY
-        # --------------------------------------------------------
-
-        synergy_bonus = 0.0
-
-        try:
-
-            active_traits = (
-                env.composition_manager
-                .active_traits
-            )
-
-            if isinstance(
-                active_traits,
-                dict,
-            ):
-
-                synergy_bonus = min(
-                    10.0,
-                    len(active_traits) * 1.5,
-                )
-
-        except Exception:
-
-            synergy_bonus = 0.0
-
-        return (
-            total
-            + positioning * 10.0
-            + synergy_bonus
-        )
-
-    # ============================================================
-    # 💪 UNIT POWER
-    # ============================================================
-
-    def _calculate_unit_power(self, unit):
-
-        if unit is None:
-            return 0.0
-
-        cost = float(
-            unit.get("cost", 1)
-        )
-
-        star = float(
-            unit.get("star", 1)
-        )
-
-        role = unit.get(
-            "role",
-            UnitRole.FIGHTER,
-        )
-
-        # --------------------------------------------------------
-        # BASE
-        # --------------------------------------------------------
-
-        power = (
-            cost * 5.0
-            + star * 8.0
-        )
-
-        # --------------------------------------------------------
-        # ROLE
-        # --------------------------------------------------------
-
-        role_bonus = {
-            UnitRole.TANK: 2.0,
-            UnitRole.CARRY: 6.0,
-            UnitRole.SUPPORT: 3.0,
-            UnitRole.FIGHTER: 4.0,
-            UnitRole.ASSASSIN: 5.0,
+        players_by_id = {
+            player.player_id: player
+            for player in self.players
         }
 
-        power += role_bonus.get(
-            role,
-            3.0,
-        )
+        for result in combat_results:
+            # Empate: não aplicar bônus nem penalidade de combate.
+            if result.draw:
+                continue
 
-        # --------------------------------------------------------
-        # STAR MULTIPLIER
-        # --------------------------------------------------------
+            if (
+                result.winner_id is None
+                or result.loser_id is None
+            ):
+                continue
 
-        if star >= 3:
+            winner = players_by_id.get(result.winner_id)
+            loser = players_by_id.get(result.loser_id)
 
-            power *= 1.75
+            if winner is None or loser is None:
+                continue
 
-        elif star >= 2:
+            # 🏆 Recompensa do vencedor.
+            winner_reward = (
+                winner.env.reward_manager.calculate_combat_reward(
+                    won=True,
+                    damage_dealt=result.damage,
+                    damage_taken=0,
+                    enemy_alive=result.loser_units,
+                    own_alive=result.winner_units,
+                )
+            )
 
-            power *= 1.30
+            # 💀 Recompensa do perdedor.
+            loser_reward = (
+                loser.env.reward_manager.calculate_combat_reward(
+                    won=False,
+                    damage_dealt=0,
+                    damage_taken=result.damage,
+                    enemy_alive=result.winner_units,
+                    own_alive=result.loser_units,
+                )
+            )
 
-        return power
+            rewards[winner.player_id] = (
+                rewards.get(winner.player_id, 0.0)
+                + float(winner_reward)
+            )
+
+            rewards[loser.player_id] = (
+                rewards.get(loser.player_id, 0.0)
+                + float(loser_reward)
+            )
+
+        return rewards
+
 
     # ============================================================
     # 📦 GET BOARD UNITS
     # ============================================================
-
     def _get_alive_units(self, env):
 
         units = []
@@ -1368,7 +1401,6 @@ class TFTLobby:
     # ============================================================
     # 🗑️ RETURN PLAYER UNITS
     # ============================================================
-
     def _return_player_units(self, env):
 
         # --------------------------------------------------------
@@ -1429,7 +1461,6 @@ class TFTLobby:
     # ============================================================
     # 🏆 ELIMINATION PLACEMENT
     # ============================================================
-
     def _next_elimination_placement(self):
 
         eliminated = sum(
@@ -1443,7 +1474,6 @@ class TFTLobby:
     # ============================================================
     # 🏆 UPDATE RANKING
     # ============================================================
-
     def update_ranking(self):
 
         alive = [
@@ -1506,7 +1536,6 @@ class TFTLobby:
     # ============================================================
     # 🏆 FINAL RANKING
     # ============================================================
-
     def _finalize_ranking(self):
 
         alive = [
@@ -1595,7 +1624,6 @@ class TFTLobby:
     # ============================================================
     # 🌍 ADVANCE ROUND
     # ============================================================
-
     def advance_round(self):
 
         self.round_index += 1
@@ -1625,7 +1653,6 @@ class TFTLobby:
     # ============================================================
     # 🌐 SET ROUND
     # ============================================================
-
     def _set_round_on_players(self):
 
         for player in self.players:
@@ -1637,7 +1664,6 @@ class TFTLobby:
     # ============================================================
     # 🏁 FINISHED
     # ============================================================
-
     def _check_finished(self):
 
         alive = [
@@ -1659,7 +1685,6 @@ class TFTLobby:
     # ============================================================
     # 📊 IS FINISHED
     # ============================================================
-
     def is_finished(self):
 
         return self.finished
@@ -1667,7 +1692,6 @@ class TFTLobby:
     # ============================================================
     # 📊 ALIVE PLAYERS
     # ============================================================
-
     def get_alive_players(self):
 
         return [
@@ -1679,7 +1703,6 @@ class TFTLobby:
     # ============================================================
     # 📊 PUBLIC STATE
     # ============================================================
-
     def get_public_state(self):
 
         return {
@@ -1770,7 +1793,6 @@ class TFTLobby:
             (placement - 1) / (self.PLAYERS_PER_LOBBY - 1)
         )
 
-
     def _apply_placement_rewards(self, rewards):
         """
         Entrega a recompensa uma única vez, assim que a colocação
@@ -1802,7 +1824,6 @@ class TFTLobby:
     # ============================================================
     # 🐛 DEBUG
     # ============================================================
-
     def debug_print(self):
 
         print(
@@ -1872,11 +1893,9 @@ class TFTLobby:
             "============================================================"
         )
 
-
 # ============================================================
 # 🧪 SIMPLE TEST
 # ============================================================
-
 if __name__ == "__main__":
 
     print(
