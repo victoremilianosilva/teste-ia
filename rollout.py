@@ -266,6 +266,12 @@ class RolloutBuffer:
 
             num_agents = num_lobbies * 8
         """
+        if self.ptr >= self.num_steps:
+            raise RuntimeError(
+                f"RolloutBuffer cheio: "
+                f"ptr={self.ptr}, "
+                f"num_steps={self.num_steps}"
+            )
 
         if valid is None:
             valid = torch.ones(
@@ -285,13 +291,6 @@ class RolloutBuffer:
             )
 
         self.valid[self.ptr].copy_(valid)
-
-        if self.ptr >= self.num_steps:
-            raise RuntimeError(
-                f"RolloutBuffer cheio: "
-                f"ptr={self.ptr}, "
-                f"num_steps={self.num_steps}"
-            )
 
         # ============================================================
         # CONVERSÃO PARA TENSOR
@@ -650,25 +649,27 @@ class RolloutBuffer:
 
     def normalize_advantages(self, eps=1e-8):
         """
-        Normaliza advantages globalmente.
-
-        Isso é feito depois do rollout completo e antes dos updates
-        PPO.
-
-        No self-play isso permite misturar experiências dos
-        diferentes jogadores/lobbies.
+        Normaliza vantagens somente das transições válidas.
+        As transições inválidas não participam da média/desvio.
         """
+        if self.ptr <= 0:
+            return
 
-        advantages = self.advantages.reshape(-1)
+        valid_mask = self.valid[:self.ptr]
 
-        mean = advantages.mean()
-        std = advantages.std(unbiased=False)
+        if not valid_mask.any():
+            return
 
-        self.advantages = (
-            self.advantages - mean
-        ) / (
-            std + eps
-        )
+        valid_advantages = self.advantages[:self.ptr][valid_mask]
+
+        mean = valid_advantages.mean()
+        std = valid_advantages.std(unbiased=False)
+
+        # Normaliza apenas os valores válidos.
+        normalized = (valid_advantages - mean) / (std + eps)
+
+        # Mantém as transições inválidas fora da normalização.
+        self.advantages[:self.ptr][valid_mask] = normalized
 
     # =================================================================
     # BATCHES
@@ -680,47 +681,18 @@ class RolloutBuffer:
         normalize_advantages=False
     ):
         """
-        Retorna mini-batches PPO.
-
-        O flatten transforma:
-
-            [num_steps, num_agents, ...]
-
-        em:
-
-            [num_steps * num_agents, ...]
-
-        Isso permite misturar experiências de:
-
-            lobby 0 / player 0
-            lobby 0 / player 1
-            ...
-            lobby 1 / player 0
-            ...
-
-        durante o treinamento PPO.
+        Gera mini-lotes contendo exclusivamente transições válidas.
         """
 
-        if self.ptr == 0:
+        if self.ptr <= 0:
             raise RuntimeError(
-                "Não é possível gerar batches: "
-                "RolloutBuffer está vazio."
+                "Não é possível gerar batches: RolloutBuffer está vazio."
             )
 
-        # ============================================================
-        # NÚMERO REAL DE STEPS
-        # ============================================================
-
-        # Normalmente será num_steps.
-        # Manter baseado em ptr deixa o buffer mais robusto caso
-        # algum rollout termine antecipadamente.
-
         steps = self.ptr
+        total_transitions = steps * self.num_envs
 
-        total_transitions = (
-            steps * self.num_envs
-        )
-
+        # 🔎 Seleciona apenas experiências válidas.
         valid_indices = torch.nonzero(
             self.valid[:steps].reshape(-1),
             as_tuple=False,
@@ -729,51 +701,27 @@ class RolloutBuffer:
         if valid_indices.numel() == 0:
             return
 
+        # 🎲 Embaralha somente os índices válidos.
         indices = valid_indices[
             torch.randperm(
                 valid_indices.numel(),
                 device=self.device,
             )
         ]
-        
-        # ============================================================
-        # ADVANTAGE
-        # ============================================================
-
-        advantages = self.advantages[:steps]
-
-        if normalize_advantages:
-
-            mean = advantages.mean()
-            std = advantages.std(
-                unbiased=False
-            )
-
-            advantages = (
-                advantages - mean
-            ) / (
-                std + 1e-8
-            )
-
-        # ============================================================
-        # FLATTEN
-        # ============================================================
 
         flat_obs = self.obs[:steps].reshape(
-            total_transitions,
-            self.obs_dim
+            total_transitions, self.obs_dim
         )
 
         flat_actions = self.actions[:steps].reshape(
-            total_transitions,
-            self.action_dim
+            total_transitions, self.action_dim
         )
 
         flat_logprobs = self.logprobs[:steps].reshape(
             total_transitions
         )
 
-        flat_advantages = advantages.reshape(
+        flat_advantages = self.advantages[:steps].reshape(
             total_transitions
         )
 
@@ -785,79 +733,39 @@ class RolloutBuffer:
             total_transitions
         )
 
-        # ============================================================
-        # MÁSCARAS
-        # ============================================================
+        flat_masks = {
+            key: tensor[:steps].reshape(
+                total_transitions,
+                *tensor.shape[2:]
+            )
+            for key, tensor in self.masks.items()
+        }
 
-        flat_masks = {}
+        # 📦 Cria mini-lotes apenas com os índices válidos.
+        for start in range(0, indices.numel(), batch_size):
+            batch_idx = indices[start:start + batch_size]
 
-        for key, mask_tensor in self.masks.items():
+            batch_advantages = flat_advantages[batch_idx]
 
-            flat_masks[key] = (
-                mask_tensor[:steps]
-                .reshape(
-                    total_transitions,
-                    *mask_tensor.shape[2:]
+            if normalize_advantages:
+                batch_advantages = (
+                    batch_advantages - batch_advantages.mean()
+                ) / (
+                    batch_advantages.std(unbiased=False) + 1e-8
                 )
-            )
-
-        # ============================================================
-        # SHUFFLE
-        # ============================================================
-
-        indices = torch.randperm(
-            total_transitions,
-            device=self.device
-        )
-
-        # ============================================================
-        # MINI-BATCHES
-        # ============================================================
-
-        for start in range(
-            0,
-            total_transitions,
-            batch_size
-        ):
-
-            end = min(
-                start + batch_size,
-                total_transitions
-            )
-
-            batch_idx = indices[
-                start:end
-            ]
 
             yield {
                 "obs": flat_obs[batch_idx],
-
-                "actions": flat_actions[
-                    batch_idx
-                ],
-
-                "logprobs": flat_logprobs[
-                    batch_idx
-                ],
-
-                "advantages": flat_advantages[
-                    batch_idx
-                ],
-
-                "returns": flat_returns[
-                    batch_idx
-                ],
-
-                "values": flat_values[
-                    batch_idx
-                ],
-
+                "actions": flat_actions[batch_idx],
+                "logprobs": flat_logprobs[batch_idx],
+                "advantages": batch_advantages,
+                "returns": flat_returns[batch_idx],
+                "values": flat_values[batch_idx],
                 "masks": {
                     key: value[batch_idx]
                     for key, value in flat_masks.items()
-                }
+                },
             }
-
     # =================================================================
     # READY
     # =================================================================
