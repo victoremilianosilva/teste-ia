@@ -472,69 +472,55 @@ class AntiLoopManager:
     # =============================================================
     # 🔁 BENCH <-> BOARD
     # =============================================================
-
-    def is_bench_board_loop(
-        self,
-        unit,
-    ):
+    
+    def is_bench_board_loop(self, unit):
         """
-        Detecta alternância:
-
-            bench -> board
-            board -> bench
-
-        da mesma unidade.
+        Detecta alternância entre banco e tabuleiro
+        para a mesma unidade, independentemente do
+        padrão de nomenclatura utilizado.
         """
 
-        identity = (
-            self._unit_identity(
-                unit
-            )
-        )
+        identity = self._unit_identity(unit)
 
-        recent = list(
-            self.move_history
-        )[-6:]
+        recent = list(self.move_history)[-6:]
 
         if len(recent) < 2:
             return False
 
+        # Normaliza os nomes usados pelo ambiente e
+        # os nomes alternativos usados pelo AntiLoopManager.
+        move_aliases = {
+            "MOVE_BENCH_TO_BOARD": "bench_to_board",
+            "bench_to_board": "bench_to_board",
+            "MOVE_BOARD_TO_BENCH": "board_to_bench",
+            "board_to_bench": "board_to_bench",
+        }
+
         relevant = []
 
         for move in recent:
+            move_type, source, target, move_unit = move
 
-            move_type, source, target, move_unit = (
-                move
-            )
-
+            # Considera somente a mesma unidade.
             if move_unit != identity:
                 continue
 
-            if move_type not in {
-                "MOVE_BENCH_TO_BOARD",
-                "MOVE_BOARD_TO_BENCH",
-            }:
+            normalized_type = move_aliases.get(move_type)
+
+            # Ignora movimentos que não envolvem banco/tabuleiro.
+            if normalized_type is None:
                 continue
 
-            relevant.append(
-                move_type
-            )
+            relevant.append(normalized_type)
 
         if len(relevant) < 2:
             return False
 
-        # Verifica alternância.
-        for index in range(
-            len(relevant) - 1
-        ):
-
-            if (
-                relevant[index]
-                == relevant[index + 1]
-            ):
-                continue
-
-            return True
+        # Detecta movimentos alternados:
+        # banco -> tabuleiro -> banco, ou vice-versa.
+        for previous, current in zip(relevant, relevant[1:]):
+            if previous != current:
+                return True
 
         return False
 
