@@ -387,7 +387,7 @@ class ActionMaskManager:
                 continue
 
             if any(
-                target != source and board_target_mask[target] > 0
+                target != source and self._is_valid_board_move(source, target)
                 for target in range(self.board_size)
             ):
                 mask[source] = 1.0
