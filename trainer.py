@@ -5,7 +5,7 @@ import os
 
 from torch.utils.tensorboard import SummaryWriter
 
-from tft_env import TFTGymEnv
+from lobby.TFTLobby import TFTLobby
 
 from stable_baselines3.common.vec_env import (
     SubprocVecEnv,
@@ -149,7 +149,7 @@ class Trainer:
         # ============================================================
 
         def make_env():
-            return TFTGymEnv()
+            return TFTLobby()
 
         # ============================================================
         # 🚀 VECTOR ENV
