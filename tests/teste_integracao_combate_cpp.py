@@ -169,6 +169,23 @@ def main():
     assert result.duration >= 0, "Duração negativa."
     assert result.events_processed >= 0, "Contagem de eventos inválida."
 
+    assert result.completed, "O combate não foi concluído."
+    assert result.duration >= 0, "Duração negativa."
+    assert result.events_processed >= 0, "Contagem de eventos inválida."
+
+    assert result.player_a_survivors >= 0
+    assert result.player_b_survivors >= 0
+    assert result.player_a_deaths >= 0
+    assert result.player_b_deaths >= 0
+
+    assert result.player_a_survivors + result.player_a_deaths <= len(team_a.units)
+    assert result.player_b_survivors + result.player_b_deaths <= len(team_b.units)
+
+    if result.winner == ce.CombatWinner.PLAYER_A:
+        assert result.player_a_survivors > 0
+    elif result.winner == ce.CombatWinner.PLAYER_B:
+        assert result.player_b_survivors > 0
+
     print("\n[OK] A chamada Python -> C++ retornou um resultado válido.")
     print("Confira as estatísticas acima para validar o comportamento.")
 

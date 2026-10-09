@@ -1036,8 +1036,6 @@ class TFTLobby:
                 winner_units=survivors_a,
                 loser_units=survivors_b,
                 damage=0,
-                winner_power=power_a,
-                loser_power=power_b,
                 draw=True,
             )
 
@@ -1053,7 +1051,6 @@ class TFTLobby:
         # 3. O dano ao jogador continua seguindo as regras de estágio.
         # _calculate_damage usa dano base do estágio + sobreviventes.
         damage = self._calculate_damage(
-            loser.env,
             winner_units,
         )
 
