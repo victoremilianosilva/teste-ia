@@ -99,8 +99,9 @@ def test_player_a_win_applies_damage_and_win_gold(monkeypatch):
     assert player_a.wins == 1
     assert player_b.losses == 1
 
-    player_a.env.economy_manager.add_gold.assert_called_once_with(
-        GameConfig.WIN_GOLD
+    player_a.env.apply_combat_result.assert_called_once_with(
+        result,
+        won=True,
     )
     player_b.env.apply_damage.assert_called_once_with(expected_damage)
 
@@ -127,8 +128,9 @@ def test_player_b_win_applies_damage_to_player_a(monkeypatch):
     assert player_b.wins == 1
     assert player_a.losses == 1
 
-    player_b.env.economy_manager.add_gold.assert_called_once_with(
-        GameConfig.WIN_GOLD
+    player_b.env.apply_combat_result.assert_called_once_with(
+        result,
+        won=True,
     )
     player_a.env.apply_damage.assert_called_once_with(expected_damage)
 
@@ -156,5 +158,5 @@ def test_draw_does_not_damage_or_reward_players(monkeypatch):
 
     player_a.env.apply_damage.assert_not_called()
     player_b.env.apply_damage.assert_not_called()
-    player_a.env.economy_manager.add_gold.assert_not_called()
-    player_b.env.economy_manager.add_gold.assert_not_called()
+    player_a.env.apply_combat_result.assert_not_called()
+    player_b.env.apply_combat_result.assert_not_called()

@@ -689,6 +689,32 @@ class TFTLobby:
             )
 
         # --------------------------------------------------------
+        # 💰 SINCRONIZA RECOMPENSAS DE COMBATE NO RELATÓRIO
+        # --------------------------------------------------------
+
+        for player in self.players:
+            economy_result = economy_results.get(
+                player.player_id
+            )
+
+            if economy_result is None:
+                continue
+
+            economy = player.env.economy_manager
+
+            # Ouro concedido pelos combates desta rodada.
+            win_gold = economy.round_win_gold
+
+            economy_result["win_gold"] = win_gold
+            economy_result["total_gold"] += win_gold
+
+            # Inclui o ouro recebido após a resolução econômica.
+            economy_result["new_gold"] = economy.gold
+
+            # Impede que o bônus apareça novamente no próximo relatório.
+            economy.round_win_gold = 0
+
+        # --------------------------------------------------------
         # ☠️ ELIMINATION
         # --------------------------------------------------------
 

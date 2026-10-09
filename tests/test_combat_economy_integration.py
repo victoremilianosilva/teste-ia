@@ -9,8 +9,7 @@ from lobby.TFTLobby import TFTLobby, CombatResult, combat_engine
 
 
 def make_player(player_id):
-    """Cria um jogador de teste usando a economia real."""
-    env._rebuild_player_state = lambda: None
+    """Cria um jogador de teste com a economia real."""
     economy = EconomyManager()
 
     env = SimpleNamespace(
@@ -21,13 +20,14 @@ def make_player(player_id):
         done=False,
     )
 
-    # Usa os métodos reais do ambiente para registrar o combate.
+    env._rebuild_player_state = lambda: None
+
     def apply_combat_result(result, won):
         env.last_combat_result = result
         env.last_combat_won = bool(won)
 
         if won:
-            economy.register_win()
+            economy.register_pvp_win()
         else:
             economy.register_loss()
 
@@ -53,7 +53,6 @@ def make_player(player_id):
         last_combat_result=None,
         last_damage_taken=0,
     )
-
 
 def make_lobby(monkeypatch, winner, survivors_a=2, survivors_b=0):
     """Simula o motor C++, mantendo a economia real."""
@@ -175,6 +174,34 @@ def test_empate_nao_altera_economia(monkeypatch):
     assert economy_b.win_streak == 0
     assert economy_b.loss_streak == 0
 
+def test_vencedor_e_perdedor_atualizam_economia_corretamente(
+    monkeypatch,
+):
+    lobby, player_a, player_b = make_lobby(
+        monkeypatch,
+        combat_engine.CombatWinner.PLAYER_A,
+        survivors_a=3,
+        survivors_b=0,
+    )
+
+    economy_a = player_a.env.economy_manager
+    economy_b = player_b.env.economy_manager
+
+    gold_a_before = economy_a.gold
+    gold_b_before = economy_b.gold
+
+    lobby.resolve_combat(player_a, player_b)
+
+    # O vencedor recebe o bônus de vitória.
+    assert economy_a.gold == gold_a_before + GameConfig.WIN_GOLD
+    assert economy_a.win_streak == 1
+    assert economy_a.loss_streak == 0
+
+    # O perdedor não recebe bônus de vitória, mas sua sequência
+    # de derrotas é atualizada para o cálculo da renda da rodada.
+    assert economy_b.gold == gold_b_before
+    assert economy_b.win_streak == 0
+    assert economy_b.loss_streak == 1
 
 def test_ouro_de_vitoria_nao_deve_acumular_entre_relatorios(monkeypatch):
     """
