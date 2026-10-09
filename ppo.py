@@ -483,6 +483,20 @@ class PPOTrainer:
             # --------------------------------------------------------
             # SELF-PLAY / ROLLOUT
             # --------------------------------------------------------
+            
+            valid_mask = rollout.valid[:rollout.ptr]
+
+            valid_rewards = (
+                rollout.rewards[:rollout.ptr][valid_mask]
+            )
+
+            valid_dones = (
+                rollout.dones[:rollout.ptr][valid_mask]
+            )
+
+            valid_transitions = int(
+                valid_mask.sum().item()
+            )
 
             self.writer.add_scalar(
                 "rollout/num_agents",
@@ -492,23 +506,19 @@ class PPOTrainer:
 
             self.writer.add_scalar(
                 "rollout/transitions",
-                rollout.size(),
+                valid_transitions,
                 self.update_step
             )
 
             self.writer.add_scalar(
                 "rollout/mean_reward",
-                rollout.rewards[
-                    :rollout.ptr
-                ].mean().item(),
+                valid_rewards.mean().item(),
                 self.update_step
             )
 
             self.writer.add_scalar(
                 "rollout/mean_done",
-                rollout.dones[
-                    :rollout.ptr
-                ].mean().item(),
+                valid_dones.mean().item(),
                 self.update_step
             )
 

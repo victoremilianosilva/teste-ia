@@ -173,34 +173,6 @@ class Trainer:
         print(f"📐 Vec observation shape: {dummy_obs.shape}")
 
         # ============================================================
-        # 👀 INITIAL OBSERVATION
-        # ============================================================
-
-        dummy_obs = self.vec_env.reset()
-
-        # Agora o shape esperado é:
-        #
-        #     (num_lobbies, 8, obs_dim)
-        #
-        # Exemplo:
-        #
-        #     (4, 8, 300)
-        #
-        # O último eixo continua sendo obs_dim.
-
-        self.obs_dim = dummy_obs.shape[-1]
-
-        print(
-            f"📐 Observation dim: "
-            f"{self.obs_dim}"
-        )
-
-        print(
-            f"📐 Vec observation shape: "
-            f"{dummy_obs.shape}"
-        )
-
-        # ============================================================
         # 🧠 POLICY
         # ============================================================
 
@@ -1248,69 +1220,81 @@ class Trainer:
                 update
             )
 
+            
             # ========================================================
             # 📊 ENTROPY SAMPLE
             # ========================================================
 
             with torch.no_grad():
 
-                sample_obs = (
-                    rollout.obs
-                    .reshape(
-                        -1,
-                        rollout.obs.shape[-1]
+                # ----------------------------------------------------
+                # Selecionar somente transições válidas
+                # ----------------------------------------------------
+
+                valid_indices = torch.nonzero(
+                    rollout.valid[:rollout.ptr].reshape(-1),
+                    as_tuple=False,
+                ).squeeze(-1)
+
+                if valid_indices.numel() > 0:
+
+                    sample_obs = (
+                        rollout.obs[:rollout.ptr]
+                        .reshape(
+                            -1,
+                            rollout.obs.shape[-1]
+                        )[valid_indices]
                     )
-                )
 
-                sample_masks = {
-                    k: v.reshape(
-                        -1,
-                        *v.shape[2:]
+                    sample_actions = (
+                        rollout.actions[:rollout.ptr]
+                        .reshape(
+                            -1,
+                            rollout.actions.shape[-1]
+                        )[valid_indices]
                     )
-                    for k, v in rollout.masks.items()
-                }
 
-                sample_actions = (
-                    rollout.actions
-                    .reshape(
-                        -1,
-                        rollout.actions.shape[-1]
+                    sample_masks = {
+                        k: v[:rollout.ptr].reshape(
+                            -1,
+                            *v.shape[2:]
+                        )[valid_indices]
+                        for k, v in rollout.masks.items()
+                    }
+
+                    # ------------------------------------------------
+                    # Limitar a amostra às primeiras 256 transições
+                    # válidas, não às primeiras 256 posições do buffer.
+                    # ------------------------------------------------
+
+                    sample_size = min(
+                        256,
+                        sample_obs.shape[0]
                     )
-                )
 
-                sample_size = min(
-                    256,
-                    sample_obs.shape[0]
-                )
+                    sample_obs = sample_obs[:sample_size]
+                    sample_actions = sample_actions[:sample_size]
 
-                sample_obs = (
-                    sample_obs[:sample_size]
-                )
+                    sample_masks = {
+                        k: v[:sample_size]
+                        for k, v in sample_masks.items()
+                    }
 
-                sample_actions = (
-                    sample_actions[:sample_size]
-                )
+                    (
+                        _,
+                        entropy_sample,
+                        _
+                    ) = self.policy.evaluate_actions(
+                        sample_obs,
+                        sample_actions,
+                        masks=sample_masks
+                    )
 
-                sample_masks = {
-                    k: v[:sample_size]
-                    for k, v in sample_masks.items()
-                }
-
-                (
-                    _,
-                    entropy_sample,
-                    _
-                ) = self.policy.evaluate_actions(
-                    sample_obs,
-                    sample_actions,
-                    masks=sample_masks
-                )
-
-                self.writer.add_scalar(
-                    "entropy/total_mean",
-                    entropy_sample.mean().item(),
-                    update
-                )
+                    self.writer.add_scalar(
+                        "entropy/total_mean",
+                        entropy_sample.mean().item(),
+                        update
+                    )
 
             # ========================================================
             # 🧠 PPO UPDATE
@@ -1340,28 +1324,46 @@ class Trainer:
                 current_lr,
                 update
             )
-
+  
             # ========================================================
             # 📊 GENERAL LOGS
             # ========================================================
 
-            self.writer.add_scalar(
-                "charts/mean_reward",
-                rollout.rewards.mean().item(),
-                update
-            )
+            valid_mask = rollout.valid[:rollout.ptr]
 
-            self.writer.add_scalar(
-                "charts/value_mean",
-                rollout.values.mean().item(),
-                update
-            )
+            if valid_mask.any():
 
-            self.writer.add_scalar(
-                "charts/advantage_mean",
-                rollout.advantages.mean().item(),
-                update
-            )
+                valid_rewards = (
+                    rollout.rewards[:rollout.ptr][valid_mask]
+                )
+
+                valid_values = (
+                    rollout.values[:rollout.ptr][valid_mask]
+                )
+
+                valid_advantages = (
+                    rollout.advantages[:rollout.ptr][valid_mask]
+                )
+
+                mean_reward = valid_rewards.mean().item()
+
+                self.writer.add_scalar(
+                    "charts/mean_reward",
+                    mean_reward,
+                    update
+                )
+
+                self.writer.add_scalar(
+                    "charts/value_mean",
+                    valid_values.mean().item(),
+                    update
+                )
+
+                self.writer.add_scalar(
+                    "charts/advantage_mean",
+                    valid_advantages.mean().item(),
+                    update
+                )
 
             # ========================================================
             # 👥 AGENTS
@@ -1422,7 +1424,7 @@ class Trainer:
                 print(
                     f"📊 UPDATE {update} | "
                     f"Reward: "
-                    f"{rollout.rewards.mean().item():.3f} | "
+                    f"{mean_reward:.3f} | "
                     f"Agents: {self.num_agents} | "
                     f"Ent: "
                     f"{self.ppo.ent_coef:.5f}"

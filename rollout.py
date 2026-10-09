@@ -665,10 +665,12 @@ class RolloutBuffer:
         mean = valid_advantages.mean()
         std = valid_advantages.std(unbiased=False)
 
-        # Normaliza apenas os valores válidos.
-        normalized = (valid_advantages - mean) / (std + eps)
+        normalized = (
+            valid_advantages - mean
+        ) / (
+            std + eps
+        )
 
-        # Mantém as transições inválidas fora da normalização.
         self.advantages[:self.ptr][valid_mask] = normalized
 
     # =================================================================
