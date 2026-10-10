@@ -1995,6 +1995,20 @@ class MiniTFTEnv:
                 "após upgrade."
             )
 
+        # --------------------------------------------------------
+        # 🔁 UPGRADE ENCADEADO: 1★ → 2★ → 3★
+        # --------------------------------------------------------
+
+        # Se a unidade ainda pode evoluir, verifica novamente
+        # se existem outras duas unidades do mesmo nível de estrela.
+        if int(upgraded.get("star", 1)) < 3:
+            chained_upgrade = self._try_upgrade_unit(upgraded)
+
+            # Se ocorreu outra evolução, retorna a unidade final.
+            if chained_upgrade is not None:
+                return chained_upgrade
+
+        # Não há outra evolução possível.
         return upgraded
 
     # ============================================================
