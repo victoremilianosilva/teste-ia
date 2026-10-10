@@ -208,15 +208,33 @@ class ShopManager:
 
             self.shop[slot] = None
 
+
     def _return_to_pool(self, unit):
         if self.unit_pool is None:
             raise RuntimeError(
                 "ShopManager precisa de um UnitPool."
             )
 
-        self.unit_pool.return_unit(
-            unit
+        # 🆔 Ofertas da loja vêm do catálogo e podem não ter "id".
+        # Convertemos o campeão para o identificador interno do pool.
+        unit_manager = getattr(
+            self.unit_pool,
+            "unit_manager",
+            None,
         )
+
+        if unit_manager is not None:
+            champion_id = unit_manager.get_unit_id(unit)
+
+            if champion_id is not None:
+                return self.unit_pool.return_copies(
+                    champion_id,
+                    1,
+                )
+
+        # Compatibilidade com unidades que já possuem ID interno.
+        return self.unit_pool.return_unit(unit)
+
 
     # =============================================================
     # 🔄 REROLL

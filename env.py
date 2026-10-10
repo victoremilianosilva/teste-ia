@@ -618,12 +618,14 @@ class MiniTFTEnv:
 
         if not self.economy_manager.spend_gold(cost):
 
-            # A cópia saiu da shop.
-            self.unit_pool.return_unit(
+            # ↩️ Devolve a oferta usando a conversão
+            # do catálogo para o ID interno do pool.
+            self.shop_manager._return_to_pool(
                 purchased_champion
             )
 
             return -0.10
+
 
         # --------------------------------------------------------
         # 🧬 CREATE OWNED UNIT

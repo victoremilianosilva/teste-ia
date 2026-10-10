@@ -1461,14 +1461,18 @@ class TFTLobby:
     # 🏆 ELIMINATION PLACEMENT
     # ============================================================
     def _next_elimination_placement(self):
-
+        """Define a colocação pela ordem de eliminação."""
         eliminated = sum(
             1
             for player in self.players
             if player.eliminated
         )
 
-        return self.PLAYERS_PER_LOBBY - eliminated
+        # O último sobrevivente fica em 1º.
+        # O último eliminado fica em 2º.
+        # O primeiro eliminado fica em 8º.
+        return self.PLAYERS_PER_LOBBY - eliminated + 1
+
 
     # ============================================================
     # 🏆 UPDATE RANKING
