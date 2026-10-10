@@ -468,7 +468,7 @@ class RolloutBuffer:
         )
 
         expected_vector = (
-            self.num_envs
+            self.num_envs,
         )
 
         if tuple(obs.shape) != expected_obs:

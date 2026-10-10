@@ -13,8 +13,8 @@ from policy import TFTPolicy
 from rollout import RolloutBuffer
 from ppo import PPOTrainer
 
-from env import Strategy, ActionType
-
+from strategy.StrategyManager import Strategy
+from ai.ActionMaskManager import ActionType
 
 class Trainer:
 
