@@ -1,12 +1,36 @@
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+import pytest
+
+
+# ============================================================
+# Configuração do módulo C++
+# ============================================================
+
+ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = ROOT / "cpp" / "build" / "bin" / "Release"
+
+if not BUILD_DIR.exists():
+    pytest.fail(
+        f"Diretório do motor C++ não encontrado: {BUILD_DIR}",
+        pytrace=False,
+    )
+
 sys.path.insert(0, str(BUILD_DIR))
 
-import combat_engine as ce
+try:
+    import combat_engine as ce
+except ImportError as exc:
+    pytest.fail(
+        f"Não foi possível importar combat_engine: {exc}",
+        pytrace=False,
+    )
 
+
+# ============================================================
+# Criação de unidades
+# ============================================================
 
 def make_unit(unit_id, team, x, y, hp=100.0):
     unit = ce.CombatUnit()
@@ -21,8 +45,8 @@ def make_unit(unit_id, team, x, y, hp=100.0):
     unit.position = pos
 
     unit.hp = float(hp)
-    unit.max_hp = 1000.0
-    unit.attack_damage = 0.0  # Não causa dano neste teste.
+    unit.max_hp = max(1000.0, float(hp))
+    unit.attack_damage = 0.0
     unit.attack_speed = 1.0
     unit.attack_range = 0.0
     unit.armor = 0.0
@@ -37,6 +61,10 @@ def make_unit(unit_id, team, x, y, hp=100.0):
     return unit
 
 
+# ============================================================
+# Execução do combate
+# ============================================================
+
 def run_battle(units_a, units_b):
     combat = ce.CombatInput()
     combat.context = ce.CombatContext.PVP
@@ -49,6 +77,7 @@ def run_battle(units_a, units_b):
     config.max_events = 10_000
     config.deterministic = True
     config.seed = 42
+
     combat.config = config
 
     team_a = ce.CombatTeam()
@@ -69,62 +98,75 @@ def run_battle(units_a, units_b):
     result = ce.simulate(combat)
 
     assert result.success, (
+        f"Falha na simulação: "
         f"{result.error_code}: {result.error_message}"
     )
+
     assert result.completed, "O combate não foi concluído."
+
     assert result.timeout, (
-        "O combate deveria ter atingido o limite de tempo."
+        "Esperava-se que o combate terminasse por timeout."
     )
 
     return result
 
 
-# TESTE 1:
-# A tem dois sobreviventes com pouca vida.
-# B tem apenas um sobrevivente com muita vida.
-# A deve ganhar porque tem mais sobreviventes.
-result_survivors = run_battle(
-    units_a=[
-        make_unit(0, ce.UnitTeam.PLAYER_A, 0, 0, hp=10),
-        make_unit(1, ce.UnitTeam.PLAYER_A, 0, 1, hp=10),
-    ],
-    units_b=[
-        make_unit(2, ce.UnitTeam.PLAYER_B, 6, 3, hp=1000),
-    ],
-)
+# ============================================================
+# TESTE 1: Desempate pelo número de sobreviventes
+# ============================================================
 
-print(
-    "Teste de sobreviventes:",
-    result_survivors.winner,
-    "| A:", result_survivors.player_a_survivors,
-    "| B:", result_survivors.player_b_survivors,
-)
+def test_timeout_tiebreak_by_survivors():
+    result = run_battle(
+        units_a=[
+            make_unit(0, ce.UnitTeam.PLAYER_A, 0, 0, hp=10),
+            make_unit(1, ce.UnitTeam.PLAYER_A, 0, 1, hp=10),
+        ],
+        units_b=[
+            make_unit(2, ce.UnitTeam.PLAYER_B, 6, 3, hp=1000),
+        ],
+    )
 
-assert result_survivors.winner == ce.CombatWinner.PLAYER_A
-assert result_survivors.player_a_survivors == 2
-assert result_survivors.player_b_survivors == 1
+    print(
+        "\nTeste de sobreviventes:",
+        result.winner,
+        "| A:", result.player_a_survivors,
+        "| B:", result.player_b_survivors,
+        "| Timeout:", result.timeout,
+    )
+
+    assert result.player_a_survivors == 2
+    assert result.player_b_survivors == 1
+
+    assert result.winner == ce.CombatWinner.PLAYER_A, (
+        "A deveria vencer por ter mais unidades sobreviventes."
+    )
 
 
-# TESTE 2:
-# Mesmo número de sobreviventes.
-# A termina com mais vida total e deve ganhar.
-result_hp = run_battle(
-    units_a=[
-        make_unit(10, ce.UnitTeam.PLAYER_A, 0, 0, hp=500),
-    ],
-    units_b=[
-        make_unit(11, ce.UnitTeam.PLAYER_B, 6, 3, hp=100),
-    ],
-)
+# ============================================================
+# TESTE 2: Desempate pela vida restante
+# ============================================================
 
-print(
-    "Teste de vida restante:",
-    result_hp.winner,
-    "| A:", result_hp.units[0].final_hp,
-    "| B:", result_hp.units[1].final_hp,
-)
+def test_timeout_tiebreak_by_remaining_hp():
+    result = run_battle(
+        units_a=[
+            make_unit(10, ce.UnitTeam.PLAYER_A, 0, 0, hp=500),
+        ],
+        units_b=[
+            make_unit(11, ce.UnitTeam.PLAYER_B, 6, 3, hp=100),
+        ],
+    )
 
-assert result_hp.player_a_survivors == result_hp.player_b_survivors
-assert result_hp.winner == ce.CombatWinner.PLAYER_A
+    print(
+        "\nTeste de vida restante:",
+        result.winner,
+        "| Sobreviventes A:", result.player_a_survivors,
+        "| Sobreviventes B:", result.player_b_survivors,
+        "| Timeout:", result.timeout,
+    )
 
-print("\\n✅ Testes de timeout e desempate passaram.")
+    assert result.player_a_survivors == 1
+    assert result.player_b_survivors == 1
+
+    assert result.winner == ce.CombatWinner.PLAYER_A, (
+        "A deveria vencer pelo critério de vida restante."
+    )

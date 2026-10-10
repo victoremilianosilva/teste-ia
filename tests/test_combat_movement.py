@@ -1,14 +1,36 @@
-
 import sys
 from pathlib import Path
 
-# Localiza o módulo C++ compilado no Windows.
-ROOT = Path(__file__).resolve().parent
+import pytest
+
+
+# ============================================================
+# Configuração do módulo C++
+# ============================================================
+
+ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = ROOT / "cpp" / "build" / "bin" / "Release"
+
+if not BUILD_DIR.exists():
+    pytest.fail(
+        f"Diretório do motor C++ não encontrado: {BUILD_DIR}",
+        pytrace=False,
+    )
+
 sys.path.insert(0, str(BUILD_DIR))
 
-import combat_engine as ce
+try:
+    import combat_engine as ce
+except ImportError as exc:
+    pytest.fail(
+        f"Não foi possível importar combat_engine: {exc}",
+        pytrace=False,
+    )
 
+
+# ============================================================
+# Criação de unidades
+# ============================================================
 
 def make_unit(unit_id, team, x, attack_range):
     unit = ce.CombatUnit()
@@ -34,6 +56,10 @@ def make_unit(unit_id, team, x, attack_range):
     return unit
 
 
+# ============================================================
+# Execução do combate
+# ============================================================
+
 def run_battle(attack_range):
     combat = ce.CombatInput()
     combat.context = ce.CombatContext.PVP
@@ -45,11 +71,12 @@ def run_battle(attack_range):
     config.max_duration = 10.0
     config.max_events = 10_000
     config.deterministic = True
+    config.seed = 42
     config.record_events = True
     config.record_positions = True
+
     combat.config = config
 
-    # As unidades começam a duas casas de distância.
     team_a = ce.CombatTeam()
     team_a.team = ce.UnitTeam.PLAYER_A
     team_a.player_id = 0
@@ -69,40 +96,73 @@ def run_battle(attack_range):
     combat.player_a = team_a
     combat.player_b = team_b
 
-    return ce.simulate(combat)
+    result = ce.simulate(combat)
+
+    assert result.success, (
+        f"Alcance {attack_range}: "
+        f"{result.error_code}: {result.error_message}"
+    )
+
+    assert result.completed, (
+        f"Alcance {attack_range}: combate não concluído."
+    )
+
+    return result
 
 
-# ------------------------------------------------------------
-# TESTE A: alcance 2 — já conseguem atacar a partir da posição inicial.
-# TESTE B: alcance 1 — precisam se aproximar primeiro.
-# ------------------------------------------------------------
+# ============================================================
+# TESTE 1: Unidades com alcance 2 não precisam se aproximar
+# ============================================================
 
-long_range = run_battle(attack_range=2.0)
-short_range = run_battle(attack_range=1.0)
+def test_units_with_range_two_do_not_need_to_move():
+    result = run_battle(attack_range=2.0)
 
-for name, result in [
-    ("Alcance 2", long_range),
-    ("Alcance 1", short_range),
-]:
-    print(f"\n--- {name} ---")
-    print("Sucesso:", result.success)
-    print("Concluído:", result.completed)
-    print("Erro:", result.error_code, result.error_message)
-    print("Vencedor:", result.winner)
-    print("Duração:", result.duration)
-    print("Eventos processados:", result.events_processed)
-    print("Movimentações:", len(result.position_events))
-    print("Ataques:", len(result.attack_events))
+    print(
+        "\n--- Teste de alcance 2 ---",
+        "\nVencedor:", result.winner,
+        "\nDuração:", result.duration,
+        "\nEventos:", result.events_processed,
+        "\nMovimentações:", len(result.position_events),
+        "\nAtaques:", len(result.attack_events),
+    )
 
-    assert result.success, f"{name}: entrada rejeitada"
-    assert result.completed, f"{name}: combate não concluído"
+    assert len(result.position_events) == 0, (
+        "As unidades com alcance 2 deveriam conseguir atacar "
+        "das posições iniciais, sem se movimentar."
+    )
 
-assert len(long_range.position_events) == 0, (
-    "Com alcance 2, as unidades deveriam atacar sem se mover."
-)
 
-assert len(short_range.position_events) > 0, (
-    "Com alcance 1, esperávamos ao menos uma movimentação."
-)
+# ============================================================
+# TESTE 2: Unidades com alcance 1 precisam se aproximar
+# ============================================================
 
-print("\n✅ Teste de movimentação e alcance passou.")
+def test_units_with_range_one_need_to_move():
+    result = run_battle(attack_range=1.0)
+
+    print(
+        "\n--- Teste de alcance 1 ---",
+        "\nVencedor:", result.winner,
+        "\nDuração:", result.duration,
+        "\nEventos:", result.events_processed,
+        "\nMovimentações:", len(result.position_events),
+        "\nAtaques:", len(result.attack_events),
+    )
+
+    assert len(result.position_events) > 0, (
+        "Esperava-se ao menos uma movimentação com alcance 1."
+    )
+
+
+# ============================================================
+# TESTE 3: Ambos os combates devem ser reproduzíveis
+# ============================================================
+
+def test_movement_combat_is_deterministic():
+    first = run_battle(attack_range=1.0)
+    second = run_battle(attack_range=1.0)
+
+    assert first.winner == second.winner
+    assert first.duration == pytest.approx(second.duration)
+    assert first.events_processed == second.events_processed
+    assert len(first.position_events) == len(second.position_events)
+    assert len(first.attack_events) == len(second.attack_events)

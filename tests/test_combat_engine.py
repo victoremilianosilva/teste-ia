@@ -1,35 +1,49 @@
-
 import sys
 from pathlib import Path
 
-root = Path(__file__).resolve().parent
-sys.path.insert(
-    0,
-    str(root / "cpp" / "build" / "bin" / "Release"),
-)
+import pytest
 
-import combat_engine as ce
+# ============================================================
+# Localização do módulo C++ compilado
+# ============================================================
 
-combat = ce.CombatInput()
-combat.config.board_rows = 4
-combat.config.board_cols = 7
-combat.config.max_duration = 30.0
-combat.config.max_events = 100_000
-combat.config.deterministic = True
-combat.config.seed = 42
+ROOT = Path(__file__).resolve().parent.parent
+BUILD_DIR = ROOT / "cpp" / "build" / "bin" / "Release"
+
+if not BUILD_DIR.exists():
+    pytest.fail(
+        f"Diretório do motor C++ não encontrado: {BUILD_DIR}",
+        pytrace=False,
+    )
+
+sys.path.insert(0, str(BUILD_DIR))
+
+try:
+    import combat_engine as ce
+except ImportError as exc:
+    pytest.fail(
+        f"Não foi possível importar combat_engine de {BUILD_DIR}: {exc}",
+        pytrace=False,
+    )
+
+
+# ============================================================
+# Fábrica de unidades
+# ============================================================
 
 def make_unit(unit_id, team, x):
     unit = ce.CombatUnit()
+
     unit.id = unit_id
     unit.name = f"Unit-{unit_id}"
     unit.star = 1
     unit.team = team
     unit.role = ce.UnitRole.FIGHTER
 
-    pos = ce.CombatPosition()
-    pos.x = x
-    pos.y = 1
-    unit.position = pos
+    position = ce.CombatPosition()
+    position.x = x
+    position.y = 1
+    unit.position = position
 
     unit.hp = 100.0
     unit.max_hp = 100.0
@@ -41,32 +55,99 @@ def make_unit(unit_id, team, x):
 
     return unit
 
-a = ce.CombatTeam()
-a.team = ce.UnitTeam.PLAYER_A
-a.player_id = 0
-a.player_hp = 100.0
-a.units = [make_unit(0, ce.UnitTeam.PLAYER_A, 0)]
 
-b = ce.CombatTeam()
-b.team = ce.UnitTeam.PLAYER_B
-b.player_id = 1
-b.player_hp = 100.0
-b.units = [make_unit(1, ce.UnitTeam.PLAYER_B, 6)]
+# ============================================================
+# Montagem do combate
+# ============================================================
 
-print("Unidades A:", len(a.units))
-print("Unidades B:", len(b.units))
+def make_combat():
+    combat = ce.CombatInput()
+    combat.context = ce.CombatContext.PVP
+    combat.seed = 42
 
-combat.player_a = a
-combat.player_b = b
+    config = ce.CombatConfig()
+    config.board_rows = 4
+    config.board_cols = 7
+    config.max_duration = 30.0
+    config.max_events = 100_000
+    config.deterministic = True
+    config.seed = 42
 
-result = ce.simulate(combat)
+    combat.config = config
 
-print("Entrada aceita:", result.success)
-print("Combate concluído:", result.completed)
-print("Erro:", result.error_code, result.error_message)
-print("Vencedor:", result.winner)
-print("Sobreviventes A/B:",
-      result.player_a_survivors,
-      result.player_b_survivors)
-print("Duração:", result.duration)
-print("Eventos:", result.events_processed)
+    team_a = ce.CombatTeam()
+    team_a.team = ce.UnitTeam.PLAYER_A
+    team_a.player_id = 0
+    team_a.player_hp = 100.0
+    team_a.units = [
+        make_unit(0, ce.UnitTeam.PLAYER_A, 0)
+    ]
+
+    team_b = ce.CombatTeam()
+    team_b.team = ce.UnitTeam.PLAYER_B
+    team_b.player_id = 1
+    team_b.player_hp = 100.0
+    team_b.units = [
+        make_unit(1, ce.UnitTeam.PLAYER_B, 6)
+    ]
+
+    combat.player_a = team_a
+    combat.player_b = team_b
+
+    return combat
+
+
+# ============================================================
+# Teste de integração do motor
+# ============================================================
+
+def test_combat_engine_executes_battle():
+    combat = make_combat()
+
+    result = ce.simulate(combat)
+
+    print("\nUnidades A:", len(combat.player_a.units))
+    print("Unidades B:", len(combat.player_b.units))
+    print("Entrada aceita:", result.success)
+    print("Combate concluído:", result.completed)
+    print("Erro:", result.error_code, result.error_message)
+    print("Vencedor:", result.winner)
+    print(
+        "Sobreviventes A/B:",
+        result.player_a_survivors,
+        result.player_b_survivors,
+    )
+    print("Duração:", result.duration)
+    print("Eventos:", result.events_processed)
+
+    # O motor precisa aceitar e concluir a simulação.
+    assert result.success, (
+        f"Entrada rejeitada: {result.error_code} "
+        f"{result.error_message}"
+    )
+
+    assert result.completed, "O combate não foi concluído."
+
+    # O resultado precisa indicar um vencedor válido.
+    assert result.winner in (
+        ce.CombatWinner.PLAYER_A,
+        ce.CombatWinner.PLAYER_B,
+        ce.CombatWinner.DRAW,
+    ), f"Vencedor inesperado: {result.winner}"
+
+    # A simulação deve produzir valores válidos.
+    assert result.duration >= 0.0
+    assert result.events_processed >= 0
+
+    # Ao final, pelo menos uma das equipes deve ter sido
+    # eliminada, ou o combate deve ter terminado em empate.
+    assert (
+        result.player_a_survivors >= 0
+        and result.player_b_survivors >= 0
+    )
+
+    if result.winner == ce.CombatWinner.PLAYER_A:
+        assert result.player_a_survivors > 0
+
+    elif result.winner == ce.CombatWinner.PLAYER_B:
+        assert result.player_b_survivors > 0

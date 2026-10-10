@@ -466,12 +466,43 @@ class Trainer:
                     self.PLAYERS_PER_LOBBY
                 ):
 
-                    player_mask = np.asarray(
-                        lobby_masks[
-                            player_idx
-                        ][key],
-                        dtype=np.bool_
-                    )
+                    raw_mask = np.asarray(lobby_masks[player_idx][key])
+
+                    expected_shape = shape
+
+                    # 1. Validar o formato antes da conversão
+                    if raw_mask.shape != expected_shape:
+                        raise ValueError(
+                            f"Máscara '{key}' inválida para "
+                            f"lobby={lobby_idx}, player={player_idx}: "
+                            f"shape recebido={raw_mask.shape}, "
+                            f"esperado={expected_shape}"
+                        )
+
+                    # 2. Aceitar somente tipos booleanos ou numéricos
+                    if not (
+                        np.issubdtype(raw_mask.dtype, np.bool_)
+                        or np.issubdtype(raw_mask.dtype, np.number)
+                    ):
+                        raise TypeError(
+                            f"Máscara '{key}' possui tipo inválido: "
+                            f"{raw_mask.dtype}"
+                        )
+
+                    # 3. Impedir NaN, infinito e valores fora de {0, 1}
+                    if not np.all(np.isfinite(raw_mask)):
+                        raise ValueError(
+                            f"Máscara '{key}' contém NaN ou infinito."
+                        )
+
+                    if not np.all((raw_mask == 0) | (raw_mask == 1)):
+                        raise ValueError(
+                            f"Máscara '{key}' deve conter somente 0 e 1."
+                        )
+
+                    # 4. Converter somente depois das validações
+                    player_mask = raw_mask.astype(np.bool_, copy=False)
+
 
                     expected_shape = shape
 
