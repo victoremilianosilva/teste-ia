@@ -220,19 +220,17 @@ class TFTLobby:
     # 🔄 RESET
     # ============================================================
     def reset(self):
+        # 🛒 1. Limpa as ofertas antigas antes de reconstruir o pool.
+        # Assim, nenhuma oferta da partida anterior pode ser
+        # devolvida depois que o estoque já tiver sido reiniciado.
+        for player in self.players:
+            player.env.shop_manager.return_current_shop()
 
-        # --------------------------------------------------------
-        # 🌐 GLOBAL POOL
-        # --------------------------------------------------------
-
+        # 📦 2. Restaura o estoque global uma única vez.
         self.unit_pool.reset()
 
-        # --------------------------------------------------------
-        # 👥 PLAYERS
-        # --------------------------------------------------------
-
+        # 👥 3. Reinicia os ambientes e os estados dos jogadores.
         for player in self.players:
-
             player.env.reset()
 
             player.alive = True
@@ -247,11 +245,8 @@ class TFTLobby:
             player.last_combat_result = None
             player.last_damage_taken = 0
             player.placement_reward_given = False
-        
-        # --------------------------------------------------------
-        # 🌍 GLOBAL
-        # --------------------------------------------------------
 
+        # 🌍 4. Reinicia o estado global da partida.
         self.stage = 1
         self.round = 1
         self.round_index = 0
@@ -276,6 +271,7 @@ class TFTLobby:
         self._set_round_on_players()
 
         return self.get_observations()
+
 
     # ============================================================
     # 📊 OBSERVATIONS
