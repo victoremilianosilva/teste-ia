@@ -80,7 +80,6 @@ class MiniTFTEnv:
         self.board_size = GameConfig.BOARD_SIZE
         self.max_bench = GameConfig.MAX_BENCH
         self.shop_size = GameConfig.SHOP_SIZE
-        self.max_rounds = GameConfig.MAX_ROUNDS
 
         # --------------------------------------------------------
         # 🧬 SHARED STATIC DATA
@@ -1255,10 +1254,9 @@ class MiniTFTEnv:
         core[4] = economy.win_streak / 10.0
         core[5] = economy.loss_streak / 10.0
 
-        core[6] = (
-            self.round
-            / max(1, self.max_rounds)
-        )
+        # Progresso relativo da partida sem depender de um limite de rounds.
+        # A escala cresce gradualmente e se aproxima de 1.0.
+        core[6] = self.round / (self.round + 10.0)
 
         core[7] = (
             len(

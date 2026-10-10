@@ -781,8 +781,7 @@ class TFTLobby:
         # 🌍 NEXT ROUND
         # --------------------------------------------------------
 
-        if not self.finished:
-
+        if len(self.get_alive_players()) > 1:
             self.advance_round()
 
         # --------------------------------------------------------
@@ -1665,22 +1664,8 @@ class TFTLobby:
     # 🏁 FINISHED
     # ============================================================
     def _check_finished(self):
-
-        alive = [
-            player
-            for player in self.players
-            if player.alive
-        ]
-
-        if len(alive) <= 1:
-
-            return True
-
-        if self.round >= GameConfig.MAX_ROUNDS:
-
-            return True
-
-        return False
+        """A partida só termina quando resta no máximo um jogador vivo."""
+        return len(self.get_alive_players()) <= 1
 
     # ============================================================
     # 📊 IS FINISHED
