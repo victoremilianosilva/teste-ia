@@ -971,9 +971,7 @@ class MiniTFTEnv:
         if removed is None:
             return -0.10
 
-        sell_value = self._get_sell_value(
-            removed
-        )
+        sell_value = self.economy_manager.get_sell_value(removed)
 
         self.economy_manager.add_gold(
             sell_value
@@ -1003,22 +1001,7 @@ class MiniTFTEnv:
     # ============================================================
 
     def _get_sell_value(self, unit):
-
-        cost = int(
-            unit.get("cost", 1)
-        )
-
-        star = int(
-            unit.get("star", 1)
-        )
-
-        if star >= 3:
-            return max(1, cost * 9)
-
-        if star >= 2:
-            return max(1, cost * 3)
-
-        return max(1, cost)
+        return self.economy_manager.get_sell_value(unit)
 
     # ============================================================
     # ⏭️ PASS
@@ -1116,9 +1099,7 @@ class MiniTFTEnv:
     # ============================================================
     # 🔄 REBUILD PLAYER STATE
     # ============================================================
-
     def _rebuild_player_state(self):
-
         owned_units = self._get_all_units()
 
         self.composition_manager.update(
@@ -1126,23 +1107,71 @@ class MiniTFTEnv:
             self.bench_manager.get_units()
         )
 
-        try:
+        # Atualiza a estratégia com a composição já recalculada.
+        self._update_strategy()
 
+        try:
             self.anti_loop_manager.register_state(
                 self.board_manager.board,
                 self.bench_manager.bench,
             )
 
         except TypeError:
-
             try:
-
                 self.anti_loop_manager.register_state(
                     self.board_manager.board
                 )
-
             except Exception:
                 pass
+
+
+    def _update_strategy(self):
+        """
+        Atualiza a estratégia com base no estado atual do jogador.
+
+        Este método apenas decide a intenção estratégica.
+        Ele não executa ações nem altera o contrato do PPO.
+        """
+        economy = self.economy_manager
+
+        # Estimativa de força do tabuleiro.
+        # Cada unidade contribui conforme custo e estrelas.
+        board_power = sum(
+            float(unit.get("cost", 1))
+            * float(unit.get("star", 1))
+            * 2.0
+            for unit in self.board_manager.board
+            if unit is not None
+        )
+
+        # Força aproximada das unidades que estão no banco.
+        bench_strength = sum(
+            float(unit.get("cost", 1))
+            * float(unit.get("star", 1))
+            for unit in self.bench_manager.bench
+            if unit is not None
+        )
+
+        # Quantidade de traits presentes na composição.
+        active_traits = len(
+            self.composition_manager.active_traits
+        )
+
+        return self.strategy_manager.decide_strategy(
+            hp=self.hp,
+            gold=economy.gold,
+            level=economy.level,
+            xp=economy.xp,
+            board_power=board_power,
+            bench_strength=bench_strength,
+            win_streak=economy.win_streak,
+            loss_streak=economy.loss_streak,
+            round_number=self.round,
+            active_traits=active_traits,
+            comp_focus=self.composition_manager.comp_focus,
+            comp_direction=self.composition_manager.comp_direction,
+        )
+
 
     # ============================================================
     # 📦 ALL OWNED UNITS
@@ -1790,7 +1819,6 @@ class MiniTFTEnv:
     # ============================================================
     # ⭐ UPGRADE
     # ============================================================
-
     def _try_upgrade_unit(self, purchased_unit):
         """
         3 × 1★ -> 1 × 2★
@@ -1802,140 +1830,135 @@ class MiniTFTEnv:
         if purchased_unit is None:
             return None
 
-        current_star = int(
-            purchased_unit.get(
-                "star",
-                1,
-            )
-        )
+        current_star = int(purchased_unit.get("star", 1))
 
         if current_star >= 3:
             return None
 
         unit_id = purchased_unit.get("id")
+        purchased_uuid = purchased_unit.get("uuid")
 
-        if unit_id is None:
+        if unit_id is None or purchased_uuid is None:
             return None
+
+        # --------------------------------------------------------
+        # 🔎 ENCONTRAR CÓPIAS COMPATÍVEIS
+        # --------------------------------------------------------
 
         candidates = []
 
-        for location, slot, unit in (
-            self._iter_owned_units()
-        ):
-
+        for location, slot, unit in self._iter_owned_units():
             if unit is None:
                 continue
 
             if unit.get("id") != unit_id:
                 continue
 
-            if int(
-                unit.get("star", 1)
-            ) != current_star:
+            if int(unit.get("star", 1)) != current_star:
                 continue
 
-            candidates.append(
-                (
-                    location,
-                    slot,
-                    unit,
-                )
-            )
+            candidates.append((location, slot, unit))
 
         if len(candidates) < 3:
             return None
 
+        # A cópia comprada deve participar do upgrade.
+        # A ordenação é estável para as demais unidades.
+        candidates.sort(
+            key=lambda candidate: (
+                candidate[2].get("uuid") != purchased_uuid
+            )
+        )
+
         selected = candidates[:3]
 
+        # Confirma que a cópia comprada foi selecionada.
+        if not any(
+            unit.get("uuid") == purchased_uuid
+            for _, _, unit in selected
+        ):
+            return None
+
         # --------------------------------------------------------
-        # 📍 Local da unidade comprada
+        # 📍 DEFINIR POSIÇÃO PREFERENCIAL
         # --------------------------------------------------------
 
         upgrade_location = None
         upgrade_slot = None
 
         for location, slot, unit in selected:
-
-            if unit.get("uuid") == purchased_unit.get("uuid"):
-
+            if unit.get("uuid") == purchased_uuid:
                 upgrade_location = location
                 upgrade_slot = slot
-
                 break
 
         if upgrade_location is None:
-
-            upgrade_location = selected[0][0]
-            upgrade_slot = selected[0][1]
+            upgrade_location, upgrade_slot, _ = selected[0]
 
         # --------------------------------------------------------
-        # 🛡️ VALIDAÇÃO ANTES DE MUTAR
+        # 🛡️ VALIDAR TODAS AS POSIÇÕES ANTES DE ALTERAR
         # --------------------------------------------------------
 
-        for location, slot, unit in selected:
-
+        for location, slot, expected_unit in selected:
             if location == "board":
-
-                if self.board_manager.get_unit(slot) is None:
-                    return None
-
+                actual_unit = self.board_manager.get_unit(slot)
             elif location == "bench":
-
-                if self.bench_manager.get_unit(slot) is None:
-                    return None
-
+                actual_unit = self.bench_manager.get_unit(slot)
             else:
+                return None
 
+            if actual_unit is None:
+                return None
+
+            # Evita remover uma unidade diferente caso o estado
+            # tenha mudado desde a coleta dos candidatos.
+            if actual_unit.get("uuid") != expected_unit.get("uuid"):
                 return None
 
         # --------------------------------------------------------
-        # 🗑️ REMOVE AS 3
+        # ⭐ CRIAR A UNIDADE MELHORADA ANTES DAS REMOÇÕES
+        # --------------------------------------------------------
+
+        try:
+            upgraded = self.unit_manager.create_upgraded_unit(
+                purchased_unit,
+                current_star + 1,
+            )
+        except (ValueError, TypeError, KeyError):
+            return None
+
+        # --------------------------------------------------------
+        # 🗑️ REMOVER AS TRÊS CÓPIAS
         # --------------------------------------------------------
 
         removed_units = []
 
-        for location, slot, unit in selected:
-
-            removed = self._remove_owned_unit(
-                location,
-                slot,
-            )
+        for location, slot, _ in selected:
+            removed = self._remove_owned_unit(location, slot)
 
             if removed is None:
-
-                # Segurança.
-                for old_location, old_slot, old_unit in removed_units:
-
-                    self._place_owned_unit(
+                # Restaura as cópias já removidas.
+                for old_location, old_slot, old_unit in reversed(
+                    removed_units
+                ):
+                    restored = self._place_owned_unit(
                         old_location,
                         old_slot,
                         old_unit,
                     )
 
+                    if not restored:
+                        raise RuntimeError(
+                            "Falha ao restaurar unidade após "
+                            "erro durante upgrade."
+                        )
+
                 return None
 
-            removed_units.append(
-                (
-                    location,
-                    slot,
-                    removed,
-                )
-            )
+            removed_units.append((location, slot, removed))
 
         # --------------------------------------------------------
-        # ⭐ CREATE UPGRADED
-        # --------------------------------------------------------
-
-        upgraded = (
-            self.unit_manager
-            .create_upgraded_unit(
-                purchased_unit,
-                current_star + 1,
-            )
-        )
-
-        # --------------------------------------------------------
-        # 📍 PLACE
+        # 📍 POSICIONAR A UNIDADE MELHORADA
         # --------------------------------------------------------
 
         success = self._place_owned_unit(
@@ -1945,17 +1968,31 @@ class MiniTFTEnv:
         )
 
         if not success:
-
-            success = (
-                self.bench_manager
-                .add_unit(upgraded)
-            )
+            # A posição original pode ter sido ocupada ou
+            # não estar mais disponível; tenta o banco.
+            success = self.bench_manager.add_unit(upgraded)
 
         if not success:
+            # Tenta restaurar as unidades originais para não
+            # perder cópias caso nenhum destino esteja disponível.
+            for old_location, old_slot, old_unit in reversed(
+                removed_units
+            ):
+                restored = self._place_owned_unit(
+                    old_location,
+                    old_slot,
+                    old_unit,
+                )
+
+                if not restored:
+                    raise RuntimeError(
+                        "Falha ao restaurar unidades após "
+                        "falha no posicionamento do upgrade."
+                    )
 
             raise RuntimeError(
-                "Não foi possível posicionar "
-                "a unidade após upgrade."
+                "Não foi possível posicionar a unidade "
+                "após upgrade."
             )
 
         return upgraded

@@ -410,3 +410,22 @@ class EconomyManager:
         )
 
         print("=" * 45)
+
+    
+    def get_sell_value(self, unit):
+        """
+        Calcula o valor de venda conforme custo e estrelas.
+        """
+        if unit is None:
+            return 0
+
+        cost = int(unit.get("cost", 1))
+        star = int(unit.get("star", 1))
+
+        if star >= 3:
+            return max(1, cost * 9)
+
+        if star >= 2:
+            return max(1, cost * 3)
+
+        return max(1, cost)

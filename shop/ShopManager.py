@@ -113,13 +113,30 @@ class ShopManager:
     # =============================================================
     # 🎯 ODDS
     # =============================================================
-
     def _get_shop_odds(self, level):
+        """
+        Retorna as probabilidades configuradas para o nível.
+
+        Prioridade:
+        1. Configuração recebida pelo ShopManager.
+        2. Configuração padrão do GameConfig, se estiver vazia.
+        """
         level = int(level)
 
-        return GameConfig.get_shop_odds(
-            level
-        )
+        odds_config = self.shop_odds
+
+        if not odds_config:
+            odds_config = GameConfig.SHOP_ODDS
+
+        if level in odds_config:
+            return list(odds_config[level])
+
+        # Mantém o comportamento anterior para níveis
+        # que não existem na configuração: usa o maior nível.
+        max_level = max(odds_config)
+
+        return list(odds_config[max_level])
+
 
     def _roll_cost(self, odds):
         costs = list(

@@ -296,7 +296,6 @@ class StrategyManager:
     # =============================================================
     # 🔄 APLICAR ESTRATÉGIA
     # =============================================================
-
     def _apply_strategy(
         self,
         strategy,
@@ -304,17 +303,16 @@ class StrategyManager:
         reason,
     ):
         """
-        Atualiza o estado interno da estratégia.
+        Atualiza o estado estratégico.
+
+        'changed' indica se a estratégia mudou nesta decisão,
+        não se ela é diferente da estratégia anterior histórica.
         """
+        changed = strategy != self.strategy
 
-        if strategy != self.strategy:
-
-            self.previous_strategy = (
-                self.strategy
-            )
-
+        if changed:
+            self.previous_strategy = self.strategy
             self.strategy_age = 0
-
         else:
             self.strategy_age += 1
 
@@ -322,10 +320,7 @@ class StrategyManager:
 
         self.confidence = max(
             0.0,
-            min(
-                1.0,
-                confidence,
-            )
+            min(1.0, float(confidence)),
         )
 
         self.last_reason = reason
@@ -334,11 +329,9 @@ class StrategyManager:
             "strategy": self.strategy,
             "confidence": self.confidence,
             "reason": self.last_reason,
-            "changed": (
-                self.previous_strategy
-                != self.strategy
-            ),
+            "changed": changed,
         }
+
 
     # =============================================================
     # 📊 CONFIANÇA
