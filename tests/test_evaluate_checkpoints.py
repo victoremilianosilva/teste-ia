@@ -13,6 +13,7 @@ import torch
 from scripts.audit_strategic_policy import _action_dict as strategic_action_dict, _json_masks, _player_gold
 
 from scripts.evaluate_checkpoints import (
+    ACTION_DIMS,
     action_dict,
     as_mask_batch,
     policy_actions,
@@ -30,6 +31,24 @@ def test_action_dict_preserves_all_six_action_components():
         "board_source": 6,
         "conditioned_board_target": 19,
     }
+
+def test_checkpoint_evaluator_uses_current_item_policy_dimensions():
+    assert ACTION_DIMS == [9, 5, 9, 28, 28, 28]
+
+
+def test_action_dict_serializes_inventory_equip_arguments_for_native_adapter():
+    result = action_dict([7, 3, 11, 0, 0, 0])
+    assert result["type"] == 7
+    assert result["item_slot"] == 3
+    assert result["item_target"] == 11
+
+
+def test_action_dict_serializes_craft_and_equip_arguments_for_native_adapter():
+    result = action_dict([8, 2, 4, 15, 0, 0])
+    assert result["type"] == 8
+    assert result["component_first"] == 2
+    assert result["component_second"] == 4
+    assert result["item_target"] == 15
 
 
 def test_as_mask_batch_selects_requested_players_and_keeps_boolean_dtype():
@@ -65,7 +84,7 @@ class _FakePolicy:
 
 def test_policy_actions_returns_one_six_component_action_per_requested_index():
     observations = np.zeros((4, 12), dtype=np.float32)
-    masks = [{"type_mask": np.ones(7, dtype=np.bool_)} for _ in range(4)]
+    masks = [{"type_mask": np.ones(9, dtype=np.bool_)} for _ in range(4)]
 
     result = policy_actions(
         _FakePolicy(),
@@ -213,6 +232,22 @@ def _seed_rows(seed, candidate_placements, baseline_placements):
                 "win": int(placement == 1),
             })
     return rows
+
+
+def test_metric_summary_reports_item_usage_and_action_rate():
+    from scripts.evaluate_checkpoints import _metric_summary
+
+    summary = _metric_summary([
+        {"placement": 1, "win": 1, "actions": 10, "item_actions": 3,
+         "equip_actions": 2, "craft_and_equip_actions": 1},
+        {"placement": 4, "win": 0, "actions": 10, "item_actions": 1,
+         "equip_actions": 1, "craft_and_equip_actions": 0},
+    ])
+    assert summary["actions"] == 20
+    assert summary["item_actions"] == 4
+    assert summary["item_action_rate"] == 0.2
+    assert summary["equip_actions"] == 3
+    assert summary["craft_and_equip_actions"] == 1
 
 
 def test_paired_seed_summary_reports_deltas_and_bootstrap_interval():
